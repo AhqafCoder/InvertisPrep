@@ -1,7 +1,6 @@
 import mongoose, { Schema } from 'mongoose';
-import { IBranch } from '../types/index.js';
 
-const branchSchema = new Schema<IBranch>(
+const branchSchema = new Schema(
   {
     id: {
       type: String,
@@ -40,4 +39,4 @@ const branchSchema = new Schema<IBranch>(
 branchSchema.index({ departmentId: 1, id: 1 }, { unique: true });
 branchSchema.index({ departmentId: 1, isActive: 1 });
 
-export const Branch = mongoose.model<IBranch>('Branch', branchSchema);
+export const Branch = mongoose.model('Branch', branchSchema);

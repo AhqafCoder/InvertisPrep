@@ -1,7 +1,6 @@
 import mongoose, { Schema } from 'mongoose';
-import { IUser, UserRole } from '../types/index.js';
 
-const userSchema = new Schema<IUser>(
+const userSchema = new Schema(
   {
     googleId: {
       type: String,
@@ -29,7 +28,7 @@ const userSchema = new Schema<IUser>(
     },
     role: {
       type: String,
-      enum: ['student', 'admin', 'super-admin'] as UserRole[],
+      enum: ['student', 'admin', 'super-admin'],
       default: 'student',
     },
     lastLogin: {
@@ -49,4 +48,4 @@ const userSchema = new Schema<IUser>(
 // Indexes
 userSchema.index({ role: 1, isActive: 1 });
 
-export const User = mongoose.model<IUser>('User', userSchema);
+export const User = mongoose.model('User', userSchema);

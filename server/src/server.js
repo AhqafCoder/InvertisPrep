@@ -1,4 +1,4 @@
-import express, { Express } from 'express';
+import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -20,7 +20,7 @@ import pyqRoutes from './routes/pyq.js';
 dotenv.config();
 
 // Initialize Express app
-const app: Express = express();
+const app = express();
 const PORT = Number(process.env.PORT) || 5000;
 
 // Connect to database
@@ -50,14 +50,11 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, Postman, etc.)
     if (!origin) return callback(null, true);
-    
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      console.warn(`CORS: Blocked origin ${origin}`);
-      callback(null, true); // Allow in production for now, log for debugging
+      callback(null, true);
     }
   },
   credentials: true,
@@ -87,11 +84,7 @@ app.use(errorHandler);
 
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n🚀 Server running on port ${PORT}`);
-  console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🌐 Local: http://localhost:${PORT}`);
-  console.log(`🌐 Network: http://172.23.6.34:${PORT}`);
-  console.log(`💚 Health: http://localhost:${PORT}/health\n`);
+  console.log(`Server running on port ${PORT}`);
 });
 
 export default app;

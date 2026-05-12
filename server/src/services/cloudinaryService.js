@@ -1,19 +1,7 @@
 import cloudinary from '../config/cloudinary.js';
 import fs from 'fs/promises';
 
-interface UploadResult {
-  cloudinaryUrl: string;
-  cloudinaryPublicId: string;
-  fileSize: number;
-}
-
-export const uploadPDF = async (
-  filePath: string,
-  _metadata: {
-    subjectCode?: string;
-    examType: string;
-  }
-): Promise<UploadResult> => {
+export const uploadPDF = async (filePath, _metadata) => {
   try {
     // Simple upload without folder and public_id to avoid signature issues
     const result = await cloudinary.uploader.upload(filePath, {
@@ -37,6 +25,6 @@ export const uploadPDF = async (
   }
 };
 
-export const deletePDF = async (publicId: string): Promise<void> => {
+export const deletePDF = async (publicId) => {
   await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' });
 };

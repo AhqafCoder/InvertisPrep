@@ -1,9 +1,8 @@
-import { Request, Response } from 'express';
 import { Department } from '../models/Department.js';
 import { Branch } from '../models/Branch.js';
 
 // Get all departments (public)
-export const getDepartments = async (_req: Request, res: Response): Promise<void> => {
+export const getDepartments = async (_req, res) => {
   try {
     const departments = await Department.find({ isActive: true }).sort({ name: 1 });
     res.json({ success: true, data: departments });
@@ -14,12 +13,21 @@ export const getDepartments = async (_req: Request, res: Response): Promise<void
 };
 
 // Create department (admin only)
-export const createDepartment = async (req: Request, res: Response): Promise<void> => {
+export const createDepartment = async (req, res) => {
   try {
     const { id, name, displayName, icon, description } = req.body;
 
     if (!id || !name || !displayName || !description) {
-      res.status(400).json({ success: false, message: 'Missing required fields' });
+      const missing = [];
+      if (!id) missing.push('id');
+      if (!name) missing.push('name');
+      if (!displayName) missing.push('displayName');
+      if (!description) missing.push('description');
+      
+      res.status(400).json({ 
+        success: false, 
+        message: `Missing required fields: ${missing.join(', ')}` 
+      });
       return;
     }
 
@@ -46,7 +54,7 @@ export const createDepartment = async (req: Request, res: Response): Promise<voi
 };
 
 // Update department (admin only)
-export const updateDepartment = async (req: Request, res: Response): Promise<void> => {
+export const updateDepartment = async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
@@ -70,7 +78,7 @@ export const updateDepartment = async (req: Request, res: Response): Promise<voi
 };
 
 // Delete department (admin only)
-export const deleteDepartment = async (req: Request, res: Response): Promise<void> => {
+export const deleteDepartment = async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -94,14 +102,15 @@ export const deleteDepartment = async (req: Request, res: Response): Promise<voi
 };
 
 // Get branches by department (public)
-export const getBranchesByDepartment = async (req: Request, res: Response): Promise<void> => {
+export const getBranchesByDepartment = async (req, res) => {
   try {
     const { departmentId } = req.params;
 
     const branches = await Branch.find({ departmentId, isActive: true }).sort({ name: 1 });
+
     res.json({ success: true, data: branches });
   } catch (error) {
-    console.error('Get branches error:', error);
+    console.error('Get branches by department error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };

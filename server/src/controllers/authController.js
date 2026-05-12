@@ -1,20 +1,17 @@
-import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User.js';
-import { LoginDTO, JWTPayload } from '../types/index.js';
 import { verifyGoogleToken } from '../services/googleAuthService.js';
 
-export const login = async (req: Request, res: Response): Promise<void> => {
+export const login = async (req, res) => {
   try {
-    const { email, password }: LoginDTO = req.body;
+    const { email, password } = req.body;
 
     if (!email || !password) {
       res.status(400).json({ success: false, message: 'Email and password are required' });
       return;
     }
 
-    // Find user with password field
     const user = await User.findOne({ email, isActive: true }).select('+password');
 
     if (!user || !user.password) {
@@ -22,7 +19,6 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Compare password
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
@@ -35,15 +31,15 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     await user.save();
 
     // Generate JWT
-    const payload: JWTPayload = {
+    const payload = {
       id: user._id.toString(),
       email: user.email,
       role: user.role,
     };
 
-    const token = jwt.sign(payload, process.env.JWT_SECRET!, {
+    const token = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn: process.env.JWT_EXPIRES_IN || '7d',
-    } as jwt.SignOptions);
+    });
 
     res.json({
       success: true,
@@ -57,12 +53,11 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       },
     });
   } catch (error) {
-    console.error('Login error:', error);
     res.status(500).json({ success: false, message: 'Server error during login' });
   }
 };
 
-export const getCurrentUser = async (req: Request, res: Response): Promise<void> => {
+export const getCurrentUser = async (req, res) => {
   try {
     if (!req.user) {
       res.status(401).json({ success: false, message: 'Not authenticated' });
@@ -92,7 +87,7 @@ export const getCurrentUser = async (req: Request, res: Response): Promise<void>
   }
 };
 
-export const googleLogin = async (req: Request, res: Response): Promise<void> => {
+export const googleLogin = async (req, res) => {
   try {
     const { token } = req.body;
 
@@ -132,15 +127,15 @@ export const googleLogin = async (req: Request, res: Response): Promise<void> =>
     }
 
     // Generate JWT
-    const payload: JWTPayload = {
+    const payload = {
       id: user._id.toString(),
       email: user.email,
       role: user.role,
     };
 
-    const jwtToken = jwt.sign(payload, process.env.JWT_SECRET!, {
+    const jwtToken = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn: process.env.JWT_EXPIRES_IN || '7d',
-    } as jwt.SignOptions);
+    });
 
     res.json({
       success: true,
@@ -159,7 +154,7 @@ export const googleLogin = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
-export const logout = async (_req: Request, res: Response): Promise<void> => {
-  res.clearCookie('token');
+export const logout = (_req, res) => {
+  // Logout is typically handled on the client side by removing the token
   res.json({ success: true, message: 'Logged out successfully' });
 };

@@ -1,6 +1,5 @@
 import multer from 'multer';
 import path from 'path';
-import { Request } from 'express';
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -14,7 +13,7 @@ const storage = multer.diskStorage({
 });
 
 // File filter for PDF only
-const fileFilter = (_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+const fileFilter = (_req, file, cb) => {
   if (file.mimetype === 'application/pdf') {
     cb(null, true);
   } else {

@@ -13,17 +13,15 @@ import { upload } from '../middleware/upload.js';
 
 const router = Router();
 
-// Public routes
+// Specific routes (must come before parameter routes)
 router.get('/', getPYQs);
-router.post('/:id/download', trackDownload);
-router.post('/:id/view', trackView);
-
-// Admin routes
 router.post('/upload', authenticateJWT, isAdmin, upload.single('pdf'), uploadPYQ);
 router.get('/all', authenticateJWT, isAdmin, getAllPYQs);
-router.delete('/:id', authenticateJWT, isAdmin, deletePYQ);
 
-// Super admin routes
+// Parameter routes with actions
+router.post('/:id/download', trackDownload);
+router.post('/:id/view', trackView);
 router.patch('/:id/verify', authenticateJWT, isSuperAdmin, verifyPYQ);
+router.delete('/:id', authenticateJWT, isAdmin, deletePYQ);
 
 export default router;

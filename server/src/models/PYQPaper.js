@@ -1,7 +1,6 @@
 import mongoose, { Schema } from 'mongoose';
-import { IPYQPaper, ExamType } from '../types/index.js';
 
-const pyqPaperSchema = new Schema<IPYQPaper>(
+const pyqPaperSchema = new Schema(
   {
     title: {
       type: String,
@@ -47,7 +46,7 @@ const pyqPaperSchema = new Schema<IPYQPaper>(
     },
     examType: {
       type: String,
-      enum: ['mid-term', 'end-term', 'sessional'] as ExamType[],
+      enum: ['mid-term', 'end-term', 'sessional'],
       required: true,
     },
     
@@ -87,7 +86,6 @@ const pyqPaperSchema = new Schema<IPYQPaper>(
     downloads: {
       type: Number,
       default: 0,
-      index: true,
     },
     verified: {
       type: Boolean,
@@ -105,16 +103,9 @@ const pyqPaperSchema = new Schema<IPYQPaper>(
   }
 );
 
-// Compound indexes for fast queries
-pyqPaperSchema.index({ 
-  departmentId: 1, 
-  branchId: 1, 
-  semester: 1, 
-  sessionId: 1 
-});
-
-pyqPaperSchema.index({ createdAt: -1 }); // Recent uploads
-pyqPaperSchema.index({ downloads: -1 }); // Popular papers
+// Compound indexes for common queries
+pyqPaperSchema.index({ departmentId: 1, branchId: 1, semester: 1, verified: 1 });
 pyqPaperSchema.index({ verified: 1, isActive: 1 });
+pyqPaperSchema.index({ year: -1, downloads: -1 });
 
-export const PYQPaper = mongoose.model<IPYQPaper>('PYQPaper', pyqPaperSchema);
+export const PYQPaper = mongoose.model('PYQPaper', pyqPaperSchema);

@@ -1,6 +1,6 @@
 import { v2 as cloudinary } from 'cloudinary';
 
-export const configureCloudinary = (): void => {
+export const configureCloudinary = () => {
   const { CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET } = process.env;
 
   if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
@@ -12,8 +12,6 @@ export const configureCloudinary = (): void => {
     api_key: CLOUDINARY_API_KEY,
     api_secret: CLOUDINARY_API_SECRET,
   });
-
-  console.log('✅ Cloudinary configured successfully');
 };
 
 export default cloudinary;

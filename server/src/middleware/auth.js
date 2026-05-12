@@ -1,21 +1,6 @@
-import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { JWTPayload } from '../types/index.js';
 
-// Extend Express Request type to include user
-declare global {
-  namespace Express {
-    interface Request {
-      user?: JWTPayload;
-    }
-  }
-}
-
-export const authenticateJWT = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
+export const authenticateJWT = async (req, res, next) => {
   try {
     const token = req.headers.authorization?.split(' ')[1] || req.cookies?.token;
 
@@ -24,7 +9,7 @@ export const authenticateJWT = async (
       return;
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JWTPayload;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
     next();
   } catch (error) {
@@ -32,7 +17,7 @@ export const authenticateJWT = async (
   }
 };
 
-export const isAdmin = (req: Request, res: Response, next: NextFunction): void => {
+export const isAdmin = (req, res, next) => {
   if (!req.user) {
     res.status(401).json({ success: false, message: 'Authentication required' });
     return;
@@ -46,7 +31,7 @@ export const isAdmin = (req: Request, res: Response, next: NextFunction): void =
   next();
 };
 
-export const isSuperAdmin = (req: Request, res: Response, next: NextFunction): void => {
+export const isSuperAdmin = (req, res, next) => {
   if (!req.user) {
     res.status(401).json({ success: false, message: 'Authentication required' });
     return;

@@ -1,8 +1,7 @@
-import { Request, Response } from 'express';
 import { Session } from '../models/Session.js';
 
 // Get all sessions (public)
-export const getSessions = async (_req: Request, res: Response): Promise<void> => {
+export const getSessions = async (_req, res) => {
   try {
     const sessions = await Session.find({ isActive: true }).sort({ startYear: -1 });
     res.json({ success: true, data: sessions });
@@ -13,7 +12,7 @@ export const getSessions = async (_req: Request, res: Response): Promise<void> =
 };
 
 // Create session (admin only)
-export const createSession = async (req: Request, res: Response): Promise<void> => {
+export const createSession = async (req, res) => {
   try {
     const { id, name, startYear, endYear } = req.body;
 
@@ -44,7 +43,7 @@ export const createSession = async (req: Request, res: Response): Promise<void> 
 };
 
 // Update session (admin only)
-export const updateSession = async (req: Request, res: Response): Promise<void> => {
+export const updateSession = async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
@@ -68,7 +67,7 @@ export const updateSession = async (req: Request, res: Response): Promise<void> 
 };
 
 // Delete session (admin only)
-export const deleteSession = async (req: Request, res: Response): Promise<void> => {
+export const deleteSession = async (req, res) => {
   try {
     const { id } = req.params;
 

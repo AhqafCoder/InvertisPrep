@@ -1,7 +1,6 @@
 import mongoose, { Schema } from 'mongoose';
-import { IDepartment } from '../types/index.js';
 
-const departmentSchema = new Schema<IDepartment>(
+const departmentSchema = new Schema(
   {
     id: {
       type: String,
@@ -43,4 +42,4 @@ const departmentSchema = new Schema<IDepartment>(
 // Indexes
 departmentSchema.index({ id: 1, isActive: 1 });
 
-export const Department = mongoose.model<IDepartment>('Department', departmentSchema);
+export const Department = mongoose.model('Department', departmentSchema);

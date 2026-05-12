@@ -1,8 +1,7 @@
-import { Request, Response } from 'express';
 import { Branch } from '../models/Branch.js';
 
 // Get all branches (admin only)
-export const getAllBranches = async (_req: Request, res: Response): Promise<void> => {
+export const getAllBranches = async (_req, res) => {
   try {
     const branches = await Branch.find().sort({ departmentId: 1, name: 1 });
     res.json({ success: true, data: branches });
@@ -13,7 +12,7 @@ export const getAllBranches = async (_req: Request, res: Response): Promise<void
 };
 
 // Create branch (admin only)
-export const createBranch = async (req: Request, res: Response): Promise<void> => {
+export const createBranch = async (req, res) => {
   try {
     const { id, name, departmentId, semesters } = req.body;
 
@@ -44,7 +43,7 @@ export const createBranch = async (req: Request, res: Response): Promise<void> =
 };
 
 // Update branch (admin only)
-export const updateBranch = async (req: Request, res: Response): Promise<void> => {
+export const updateBranch = async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
@@ -64,7 +63,7 @@ export const updateBranch = async (req: Request, res: Response): Promise<void> =
 };
 
 // Delete branch (admin only)
-export const deleteBranch = async (req: Request, res: Response): Promise<void> => {
+export const deleteBranch = async (req, res) => {
   try {
     const { id } = req.params;
 

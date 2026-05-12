@@ -1,7 +1,6 @@
 import mongoose, { Schema } from 'mongoose';
-import { ISession } from '../types/index.js';
 
-const sessionSchema = new Schema<ISession>(
+const sessionSchema = new Schema(
   {
     id: {
       type: String,
@@ -39,4 +38,4 @@ const sessionSchema = new Schema<ISession>(
 sessionSchema.index({ startYear: -1 }); // Sort by year descending
 sessionSchema.index({ isActive: 1 });
 
-export const Session = mongoose.model<ISession>('Session', sessionSchema);
+export const Session = mongoose.model('Session', sessionSchema);

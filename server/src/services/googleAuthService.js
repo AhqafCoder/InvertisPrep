@@ -6,14 +6,7 @@ const client = new OAuth2Client(
   process.env.CLIENT_URL
 );
 
-export interface GoogleUserInfo {
-  email: string;
-  name: string;
-  picture?: string;
-  email_verified: boolean;
-}
-
-export const verifyGoogleToken = async (token: string): Promise<GoogleUserInfo> => {
+export const verifyGoogleToken = async (token) => {
   const ticket = await client.verifyIdToken({
     idToken: token,
     audience: process.env.GOOGLE_CLIENT_ID,
@@ -25,8 +18,8 @@ export const verifyGoogleToken = async (token: string): Promise<GoogleUserInfo> 
   }
 
   return {
-    email: payload.email!,
-    name: payload.name!,
+    email: payload.email,
+    name: payload.name,
     picture: payload.picture,
     email_verified: payload.email_verified || false,
   };

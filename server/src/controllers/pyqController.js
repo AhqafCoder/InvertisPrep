@@ -1,10 +1,8 @@
-import { Request, Response } from 'express';
 import { PYQPaper } from '../models/PYQPaper.js';
 import { uploadPDF, deletePDF } from '../services/cloudinaryService.js';
-import { UploadPYQDTO, PYQFilterQuery } from '../types/index.js';
 
 // Upload PYQ (admin only)
-export const uploadPYQ = async (req: Request, res: Response): Promise<void> => {
+export const uploadPYQ = async (req, res) => {
   try {
     if (!req.file) {
       res.status(400).json({ success: false, message: 'PDF file is required' });
@@ -20,7 +18,7 @@ export const uploadPYQ = async (req: Request, res: Response): Promise<void> => {
       subjectCode,
       examType,
       year,
-    }: UploadPYQDTO = req.body;
+    } = req.body;
 
     // Validate required fields
     if (!departmentId || !branchId || !sessionId || !semester || !subjectName || !examType || !year) {
@@ -52,7 +50,7 @@ export const uploadPYQ = async (req: Request, res: Response): Promise<void> => {
       cloudinaryPublicId,
       fileName: req.file.originalname,
       fileSize,
-      uploadedBy: req.user!.id,
+      uploadedBy: req.user.id,
       verified: false,
       isActive: true,
     });
@@ -65,12 +63,12 @@ export const uploadPYQ = async (req: Request, res: Response): Promise<void> => {
 };
 
 // Get filtered PYQs (public)
-export const getPYQs = async (req: Request, res: Response): Promise<void> => {
+export const getPYQs = async (req, res) => {
   try {
-    const { departmentId, branchId, sessionId, semester, examType, subjectCode }: PYQFilterQuery = req.query;
+    const { departmentId, branchId, sessionId, semester, examType, subjectCode } = req.query;
 
     // Build dynamic filter
-    const filter: any = { verified: true, isActive: true };
+    const filter = { verified: true, isActive: true };
     if (departmentId) filter.departmentId = departmentId;
     if (branchId) filter.branchId = branchId;
     if (sessionId) filter.sessionId = sessionId;
@@ -93,7 +91,7 @@ export const getPYQs = async (req: Request, res: Response): Promise<void> => {
 };
 
 // Get all PYQs (admin only)
-export const getAllPYQs = async (_req: Request, res: Response): Promise<void> => {
+export const getAllPYQs = async (_req, res) => {
   try {
     const papers = await PYQPaper.find()
       .populate('departmentId', 'name displayName')
@@ -111,7 +109,7 @@ export const getAllPYQs = async (_req: Request, res: Response): Promise<void> =>
 };
 
 // Track download
-export const trackDownload = async (req: Request, res: Response): Promise<void> => {
+export const trackDownload = async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -130,7 +128,7 @@ export const trackDownload = async (req: Request, res: Response): Promise<void> 
 };
 
 // Track view
-export const trackView = async (req: Request, res: Response): Promise<void> => {
+export const trackView = async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -149,11 +147,17 @@ export const trackView = async (req: Request, res: Response): Promise<void> => {
 };
 
 // Verify PYQ (super admin only)
-export const verifyPYQ = async (req: Request, res: Response): Promise<void> => {
+export const verifyPYQ = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const pyq = await PYQPaper.findByIdAndUpdate(id, { $set: { verified: true } }, { new: true });
+    const pyq = await PYQPaper.findByIdAndUpdate(
+      id, 
+      { $set: { verified: true } }, 
+      { new: true }
+    ).populate('departmentId', 'name displayName')
+      .populate('branchId', 'name')
+      .populate('sessionId', 'name');
 
     if (!pyq) {
       res.status(404).json({ success: false, message: 'PYQ not found' });
@@ -163,12 +167,12 @@ export const verifyPYQ = async (req: Request, res: Response): Promise<void> => {
     res.json({ success: true, data: pyq });
   } catch (error) {
     console.error('Verify PYQ error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: 'Server error during verification' });
   }
 };
 
 // Delete PYQ (admin only)
-export const deletePYQ = async (req: Request, res: Response): Promise<void> => {
+export const deletePYQ = async (req, res) => {
   try {
     const { id } = req.params;
 
