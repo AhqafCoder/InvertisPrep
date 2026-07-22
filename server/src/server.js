@@ -1,4 +1,5 @@
 import express from 'express';
+import http from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -24,12 +25,24 @@ import reportRoutes from './routes/reports.js';
 import pdfRoutes from './routes/pdf.js';
 import resumeRoutes from './routes/resumes.js';
 import walletRoutes from './routes/wallet.js';
+import httpProxy from 'http-proxy';
+
+// Create a proxy server instance for Quizoo standalone backend
+const quizooProxy = httpProxy.createProxyServer({});
+quizooProxy.on('error', (err, req, res) => {
+  console.error('[Quizoo Proxy] Error:', err);
+  if (res && res.writeHead && !res.headersSent) {
+    res.writeHead(502, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: false, message: 'Quizoo service is temporarily unavailable.' }));
+  }
+});
 
 // Load environment variables
 dotenv.config();
 
 // Initialize Express app
 const app = express();
+const httpServer = http.createServer(app);
 const PORT = Number(process.env.PORT) || 5000;
 
 // CORS Configuration
@@ -73,6 +86,17 @@ const initApp = async () => {
     allowedHeaders: ['Content-Type', 'Authorization'],
   }));
 
+  // Proxy Quizoo REST API & Socket.io polling requests BEFORE body parsing to prevent hangs
+  app.use('/api/quizoo', (req, res) => {
+    req.url = '/api/quizoo' + req.url;
+    quizooProxy.web(req, res, { target: process.env.QUIZOO_BACKEND_URL || 'http://localhost:5001' });
+  });
+
+  app.use('/socket.io', (req, res) => {
+    req.url = '/socket.io' + req.url;
+    quizooProxy.web(req, res, { target: process.env.QUIZOO_BACKEND_URL || 'http://localhost:5001' });
+  });
+
   app.use(morgan('dev'));
   // Resume drafts can include a deliberately small base64 profile photo.
   app.use(express.json({ limit: '3mb' }));
@@ -97,12 +121,19 @@ const initApp = async () => {
   app.use('/api/resumes', resumeRoutes);
   app.use('/api/wallet', walletRoutes);
 
+  // Proxy Quizoo Socket.io WebSocket upgrade requests
+  httpServer.on('upgrade', (req, socket, head) => {
+    if (req.url.startsWith('/socket.io')) {
+      quizooProxy.ws(req, socket, head, { target: process.env.QUIZOO_BACKEND_URL || 'http://localhost:5001' });
+    }
+  });
+
   // Error handling
   app.use(notFound);
   app.use(errorHandler);
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT}`);
+  httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server & Socket.io running on port ${PORT}`);
   });
 };
 
@@ -112,3 +143,4 @@ initApp().catch((error) => {
 });
 
 export default app;
+

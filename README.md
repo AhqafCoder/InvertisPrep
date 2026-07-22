@@ -117,22 +117,25 @@ InvertisPrep/
 │   │   ├── admin/               # Protected admin area
 │   │   │   ├── dashboard/ departments/ branches/ sessions/
 │   │   │   ├── upload/ papers/ syllabus/ reports/
-│   │   └── quizz0/              # "Coming Soon" placeholder
+│   │   └── quizz0/              # Multiplayer Quizoo application (Indigo, Purple & White theme)
 │   ├── components/              # Navbar, ProtectedRoute, PDFViewer, layout/*, ui/* (shadcn)
 │   ├── contexts/AuthContext.tsx
-│   ├── lib/api.ts               # axios instance + domain API modules
+│   ├── lib/
+│   │   ├── api.ts               # axios instance + domain API modules
+│   │   ├── quizooApi.ts         # Quizoo REST API & TS types
+│   │   └── quizooSound.ts       # Web Audio API sound synthesizer
 │   ├── types/index.ts           # shared TS types
 │   └── public/                  # sitemap.xml, robots.txt, team photos
 │
 ├── server/                      # Express + MongoDB backend
 │   └── src/
-│       ├── server.js            # bootstrap, middleware, route mounts
+│       ├── server.js            # Express bootstrap, Socket.io real-time server
 │       ├── config/              # database.js, cloudinary.js
-│       ├── models/              # User, PYQPaper, Department, Branch, Session, Report, Syllabus
-│       ├── controllers/         # business logic per resource
-│       ├── routes/              # Express routers per resource
+│       ├── models/              # User, PYQPaper, Department, Branch, Session, Quizoo, Report, Syllabus
+│       ├── controllers/         # quizooController.js, authController.js, pyqController.js, …
+│       ├── routes/              # quizoo.js, auth.js, pyq.js, …
+│       ├── services/            # quizooSocket.js, googleAuthService.js, cloudinaryService.js
 │       ├── middleware/          # auth.js (JWT + role guards), upload.js (multer), errorHandler.js
-│       ├── services/            # cloudinaryService.js, googleAuthService.js
 │       ├── utils/seedSuperAdmin.js
 │       └── types/index.js       # JSDoc typedefs
 │
@@ -160,13 +163,39 @@ InvertisPrep/
 - **Social graph** — follow/unfollow users, public profiles showing their last 10 verified papers.
 - **Content reporting & moderation** — report papers for wrong file/quality/metadata; admin triage UI.
 - **Analytics** — per-paper view & download counters.
+- **Multiplayer Quizoo Arena** (`/quizz0`) — Real-time academic trivia battles with Indigo, Purple, and White theme, Socket.io real-time rooms (6-digit PIN), AI bot opponents, speed/streak multipliers, Web Audio API sound synthesizer, victory podium confetti, and QCoin rewards.
+- **Dynamic Database Course Integration** — Quizoo queries active `Department` documents directly from MongoDB, enabling quizzes across all academic courses (Computer Science, Management, Biotech, Law, Pharmacy, Agriculture, Engineering Math, Aptitude, PYQ Special).
 - **Soft deletes** across all entities (`isActive: false`).
 - **Dark/light theme**, responsive design, SEO assets (sitemap, robots, webmanifest).
 
-### 🚧 Coming Soon (UI placeholders, no backend yet)
-- **Quizzo** — quiz/mock-test platform (`/quizz0`).
-- **Leaderboard** (disabled nav button).
-- **Student dashboard**, **Academic Progress**, **QC Wallet** (nav links exist but routes are not implemented).
+### 🚧 Coming Soon (UI placeholders)
+- **Leaderboard** (standalone full route).
+- **Student dashboard**, **Academic Progress** (nav links exist).
+
+---
+
+## ⚡ Multiplayer Quizoo
+
+The **Quizoo Multiplayer Arena** (`/quizz0`) lets students create or join live academic trivia matches, test knowledge across all university courses, and earn QCoins.
+
+### Key Highlights
+1. **Indigo, Purple & White Aesthetic**: High-contrast, vibrant gaming UI (`bg-indigo-950`, `bg-white/95`, `from-indigo-600 via-purple-600 to-indigo-800`).
+2. **Game Modes**:
+   - **Host Room**: Generate a 6-digit PIN code, pick any department/course from database, configure question time (10s-30s), and toggle AI bots.
+   - **Join Room**: Enter 6-digit PIN with custom avatar emoji (`⚡`, `🚀`, `🧙‍♂️`, `👑`, `🎯`, `🔥`, `🏆`, `💎`).
+   - **Quick Solo Match**: Play instantly against 3 AI bot opponents (*ByteBot 🤖*, *LogicWizard 🧙‍♂️*, *CyberNova ⚡*).
+3. **Live Arena**: Animated circular timer, speed bonus calculator (+400 pts), consecutive streak multipliers (🔥 2x / 3x), and immediate solution explanations.
+4. **Victory Podium & Audio**: 3D 1st/2nd/3rd podiums with gold/silver/bronze trophies, victory confetti (`canvas-confetti`), and Web Audio API synthesizer sounds (clicks, ticks, correct chimes, wrong buzzes, fanfare).
+
+### API Endpoints
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/quizoo/categories` | Returns dynamic course categories merged from MongoDB departments |
+| `GET` | `/api/quizoo/questions` | Get question bank filtered by course category |
+| `POST` | `/api/quizoo/rooms/create` | Host a new quiz room & generate 6-digit PIN |
+| `GET` | `/api/quizoo/rooms/:pin` | Fetch room state by PIN |
+| `GET` | `/api/quizoo/leaderboard` | Get Quizoo Hall of Fame high scores |
+| `POST` | `/api/quizoo/complete` | Submit score & receive reward QCoins |
 
 ---
 
