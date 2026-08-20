@@ -7,18 +7,24 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { resumeApi, walletApi } from '@/lib/api';
 import type { Resume, ResumeDraft, ResumeEducation, ResumeExperience, ResumeLink, ResumeProject } from '@/types';
-import { CheckCircle2, Clock, Coins, CreditCard, Download, FileUp, Gift, LayoutDashboard, Loader2, Plus, Printer, Save, Shield, Sparkles, Trash2, Wallet } from 'lucide-react';
+import {
+  CheckCircle2, Clock, Coins, CreditCard, Download, FileUp, Gift,
+  LayoutDashboard, Loader2, Plus, Printer, Save, Shield, Sparkles, Trash2,
+  Wallet, ChevronDown, ChevronUp, FileText, Settings2, Eye, ZoomIn, ZoomOut,
+  Maximize2, Minimize2, Minus,
+} from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Spotlight } from '@/components/ui/spotlight';
 import { SavePromptModal } from './SavePromptModal';
+import { AISidebar } from './AISidebar';
+import { TemplatesModal } from './TemplatesModal';
 
-const emptyEducation = (): ResumeEducation => ({ institution: '', degree: '', startDate: '', endDate: '' });
+// ─── Factories ─────────────────────────────────────────────────────────────────
+const emptyEducation  = (): ResumeEducation  => ({ institution: '', degree: '', startDate: '', endDate: '' });
 const emptyExperience = (): ResumeExperience => ({ company: '', role: '', description: '', achievements: [''], startDate: '', endDate: '' });
-const emptyProject = (): ResumeProject => ({ name: '', url: '', description: '', achievements: [''], startDate: '', endDate: '' });
-const emptyLink = (): ResumeLink => ({ label: '', url: '' });
+const emptyProject    = (): ResumeProject    => ({ name: '', url: '', description: '', achievements: [''], startDate: '', endDate: '' });
+const emptyLink       = (): ResumeLink       => ({ label: '', url: '' });
 
 export function createStarterResume(): ResumeDraft {
   return {
@@ -27,110 +33,68 @@ export function createStarterResume(): ResumeDraft {
       name: 'Ahqaf Ali', headline: 'Developer', email: 'beddylea@gmail.com',
       phone: '+1-555-0100', location: 'San Francisco, CA',
       links: [
-        { label: 'GitHub', url: 'github.com/ahqafcoder' },
-        { label: 'LinkedIn', url: 'linkedin.com/in/bedivere-lea' },
+        { label: 'GitHub',    url: 'github.com/ahqafcoder' },
+        { label: 'LinkedIn',  url: 'linkedin.com/in/bedivere-lea' },
         { label: 'Instagram', url: 'instagram.com/ahqafali0403' },
       ],
     },
-    summary: 'Resourceful Developer with 11 years of experience in designing and developing user interfaces, testing and training employees. Skilled at utilizing a wide variety of tools and programs to provide effective applications.',
+    summary: 'Resourceful Developer with 11 years of experience in designing and developing user interfaces, testing and training employees.',
     education: [
       { institution: 'New York University', degree: 'Bachelor of Computer Science', startDate: '2020-08', endDate: '2024-07' },
     ],
     experience: [
-      { company: 'Torph TTC', role: 'Developer', description: 'Torph TTC is a global software company that offers user interface UI development tools and components for a range of developer applications across all platforms.', achievements: ['Created and maintained 10 web applications for numerous national and foreign clients.', 'Ensured user interfaces and user experience met at least 80% of users expectations.', 'Created and analyzed 500 unit test cases.', "Developed Python scripts to automate image noise-reduction, improving research analysis time by 40%.", 'Established and led a team of 10 people, covering every key role in the early stages.'], startDate: '2023-02', endDate: '2023-02' },
-      { company: 'Reilty Group', role: 'Front End Web Developer', description: 'Reilty Group is an industry-leading provider of online gambling software and solutions.', achievements: ['Increased the reach of users to the platform by 35% through mobile web installation.', 'Delivered 30 web solutions.', 'Replaced one full-time developer with part-time employment, achieving over 60% productivity gain.', 'Worked with more than four teams and provided end-to-end client solutions.'], startDate: '2023-02', endDate: '2023-03' },
-      { company: 'HellX', role: 'Python Developer', description: 'Heller is a software editor specialized in logistics management.', achievements: ['Developed automation systems that saved over $50,000 annually.', 'Joined as the tenth employee and worked directly with major customers.', 'Delivered ahead of schedule, reducing project cost by 20%.', 'Reduced database size by nearly 50% and improved performance by 20%.', 'Reduced delivery time of goods by 50%.'], startDate: '2023-02', endDate: '2023-03' },
+      { company: 'Torph TTC', role: 'Developer', description: 'Global software company offering UI development tools for developer applications.', achievements: ['Created and maintained 10 web applications for national and foreign clients.', 'Ensured UX met at least 80% of user expectations.', 'Created and analyzed 500 unit test cases.'], startDate: '2023-02', endDate: '2023-08' },
+      { company: 'Reilty Group', role: 'Front End Web Developer', description: 'Industry-leading provider of online gambling software and solutions.', achievements: ['Increased user reach by 35% through mobile web installation.', 'Delivered 30 web solutions.'], startDate: '2022-06', endDate: '2023-01' },
     ],
     projects: [],
     skillGroups: [
-      { title: 'Technical Skills', items: ['JavaScript', 'Python', 'Web Services', 'C++', 'HTML5', 'CSS', 'SQL', 'User Interface', 'Creativity'] },
-      { title: 'Soft Skills', items: ['Collaboration', 'Problem-solving', 'Communication', 'Time management', 'Result-oriented'] },
-      { title: 'Additional Skills', items: ['Public Speaking', 'Writing', 'Research'] },
+      { title: 'Technical Skills', items: ['JavaScript', 'Python', 'C++', 'HTML5', 'CSS', 'SQL'] },
+      { title: 'Soft Skills',      items: ['Collaboration', 'Problem-solving', 'Communication'] },
     ],
-    achievements: [
-      'Winner - Smart India Hackathon (SIH) 2025 | December 2025',
-      'Technical Designer Award - Fashion Show | May 2026',
-    ],
+    achievements: ['Winner - Smart India Hackathon (SIH) 2025 | December 2025'],
     languages: ['English', 'Hindi'],
-    certifications: ['Certified Web Professional-Web Developer', 'Java Development Certified Professional'],
+    certifications: ['Certified Web Professional-Web Developer'],
   };
 }
 
-// safeResume — lightweight structural safety pass for EXISTING saved resumes.
-// Only ensures arrays are arrays and objects are objects. Never injects template content.
 function safeResume(resume: Resume): Resume {
-  // Migrate old generic template data that was seeded before the builder was live
   const isPreviousGenericTemplate =
     resume.title === 'Ahqaf Ali - Full Stack Developer' ||
     resume.summary?.startsWith('Motivated student and aspiring software developer') ||
-    resume.projects?.some((project) => project.name === 'Student Portfolio Website');
-  if (isPreviousGenericTemplate) {
-    // Replace old generic template with the current starter so users get the new template
-    return { ...resume, ...createStarterResume() };
-  }
+    resume.projects?.some((p) => p.name === 'Student Portfolio Website');
+  if (isPreviousGenericTemplate) return { ...resume, ...createStarterResume() };
 
   const personal = resume.personal ?? { name: '', headline: '', email: '', phone: '', location: '', links: [] };
   return {
     ...resume,
-    title: resume.title ?? '',
+    title:    resume.title ?? '',
     personal: {
-      name: personal.name ?? '',
+      name:     personal.name     ?? '',
       headline: personal.headline ?? '',
-      email: personal.email ?? '',
-      phone: personal.phone ?? '',
+      email:    personal.email    ?? '',
+      phone:    personal.phone    ?? '',
       location: personal.location ?? '',
-      links: Array.isArray(personal.links)
-        ? personal.links.map((link) => ({ ...emptyLink(), ...link }))
-        : [],
+      links:    Array.isArray(personal.links) ? personal.links.map((l) => ({ ...emptyLink(), ...l })) : [],
     },
-    summary: resume.summary ?? '',
-    education: Array.isArray(resume.education)
-      ? resume.education.map((item) => ({ ...emptyEducation(), ...item }))
-      : [],
-    experience: Array.isArray(resume.experience)
-      ? resume.experience.map((item) => ({
-          ...emptyExperience(), ...item,
-          achievements: Array.isArray(item.achievements) ? item.achievements : [],
-        }))
-      : [],
-    projects: Array.isArray(resume.projects)
-      ? resume.projects.map((item) => ({
-          ...emptyProject(), ...item,
-          achievements: Array.isArray(item.achievements) ? item.achievements : [],
-        }))
-      : [],
-    skillGroups: Array.isArray(resume.skillGroups)
-      ? resume.skillGroups.map((group) => ({
-          ...group,
-          title: group.title ?? '',
-          items: Array.isArray(group.items) ? group.items : [],
-        }))
-      : [],
-    achievements: Array.isArray(resume.achievements) ? resume.achievements : [],
-    languages: Array.isArray(resume.languages) ? resume.languages : [],
+    summary:      resume.summary ?? '',
+    education:    Array.isArray(resume.education)   ? resume.education.map((i) => ({ ...emptyEducation(), ...i })) : [],
+    experience:   Array.isArray(resume.experience)  ? resume.experience.map((i) => ({ ...emptyExperience(), ...i, achievements: Array.isArray(i.achievements) ? i.achievements : [] })) : [],
+    projects:     Array.isArray(resume.projects)    ? resume.projects.map((i) => ({ ...emptyProject(), ...i, achievements: Array.isArray(i.achievements) ? i.achievements : [] })) : [],
+    skillGroups:  Array.isArray(resume.skillGroups) ? resume.skillGroups.map((g) => ({ ...g, title: g.title ?? '', items: Array.isArray(g.items) ? g.items : [] })) : [],
+    achievements: Array.isArray(resume.achievements)    ? resume.achievements    : [],
+    languages:    Array.isArray(resume.languages)       ? resume.languages       : [],
     certifications: Array.isArray(resume.certifications) ? resume.certifications : [],
   };
 }
 
 function toDraft(resume: Resume): ResumeDraft {
-  return {
-    title: resume.title,
-    personal: resume.personal,
-    summary: resume.summary,
-    education: resume.education,
-    experience: resume.experience,
-    projects: resume.projects,
-    skillGroups: resume.skillGroups,
-    achievements: resume.achievements,
-    languages: resume.languages,
-    certifications: resume.certifications,
-  };
+  const { _id, createdAt, updatedAt, ...draft } = resume as any;
+  return draft as ResumeDraft;
 }
 
-function safeName(value: string) {
-  return (value || 'resume').replace(/[^a-z0-9-_]+/gi, '-').replace(/^-|-$/g, '').toLowerCase();
+function safeName(v: string) {
+  return (v || 'resume').replace(/[^a-z0-9-_]+/gi, '-').replace(/^-|-$/g, '').toLowerCase();
 }
-
 function formatDate(value: string) {
   if (!value) return '';
   const [year, month] = value.split('-');
@@ -138,85 +102,81 @@ function formatDate(value: string) {
   return new Date(Number(year), Number(month) - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
-// Global flag to suppress beforeunload during OAuth redirect
 export const navigationFlag = { suppress: false };
+const GUEST_KEY = 'resume-builder-guest-draft';
+function stashGuestResume(draft: ResumeDraft) { try { localStorage.setItem(GUEST_KEY, JSON.stringify(draft)); } catch { } }
+export function clearGuestResume() { localStorage.removeItem(GUEST_KEY); }
 
-// Minimal localStorage helper — only used to stash draft before OAuth redirect
-const GUEST_RESUME_KEY = 'resume-builder-guest-draft';
-function stashGuestResume(draft: ResumeDraft): void {
-  try { localStorage.setItem(GUEST_RESUME_KEY, JSON.stringify(draft)); } catch { /* noop */ }
-}
-export function clearGuestResume(): void {
-  localStorage.removeItem(GUEST_RESUME_KEY);
-}
+// ─── Style tokens ──────────────────────────────────────────────────────────────
+const inputCls    = 'bg-white border-zinc-200 focus-visible:border-zinc-800 focus-visible:ring-zinc-100 text-sm text-zinc-800 placeholder:text-zinc-400';
+const textareaCls = 'w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400 outline-none focus:border-zinc-700 focus:ring-2 focus:ring-zinc-100 resize-none transition';
 
+// ─── Panel width constraints ───────────────────────────────────────────────────
+const MIN_LEFT  = 240;
+const MAX_LEFT  = 480;
+const MIN_RIGHT = 340;
+const MAX_RIGHT = 640;
+
+// ─── Main Component ─────────────────────────────────────────────────────────────
 export function ResumeBuilder() {
   const { user, loading, updateUser } = useAuth();
-  const router = useRouter();
+  const router       = useRouter();
   const searchParams = useSearchParams();
-  const [resume, setResume] = useState<Resume | null>(null);
-  const [booting, setBooting] = useState(true);
-  const [saving, setSaving] = useState(false);
 
-  // Save prompt modal state for guest users (declared early for beforeunload guard)
+  const [resume, setResume]     = useState<Resume | null>(null);
+  const [booting, setBooting]   = useState(true);
+  const [saving, setSaving]     = useState(false);
+  const [isDirty, setIsDirty]   = useState(false);
+  const [savedAt, setSavedAt]   = useState<Date | null>(null);
   const [showSavePrompt, setShowSavePrompt] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
-
-  // Task 3: dirty flag + saved timestamp for autosave indicator
-  const [isDirty, setIsDirty] = useState(false);
-  const [savedAt, setSavedAt] = useState<Date | null>(null);
   const firstAutosaveToastShown = useRef(false);
+  const loadedIdRef             = useRef<string | null>(null);
+  const importRef               = useRef<HTMLInputElement>(null);
+  const idParam                 = searchParams.get('id');
 
-  // Task 1: track which id is already loaded to avoid redundant fetches
-  const loadedIdRef = useRef<string | null>(null);
-  const importRef = useRef<HTMLInputElement>(null);
+  // ── Panel widths (resizable) ──
+  const [leftW,  setLeftW]  = useState(300);
+  const [rightW, setRightW] = useState(430);
+  const workspaceRef = useRef<HTMLDivElement>(null);
 
-  // Guest mode: allow access without login
-  // Auth redirect removed to support guest resume building
+  // ── Preview zoom ──
+  const ZOOM_STEPS = [50, 60, 70, 80, 90, 100, 110, 125];
+  const [zoomIdx, setZoomIdx]     = useState(5); // 100%
+  const [fullscreen, setFullscreen] = useState(false);
+  const zoom = ZOOM_STEPS[zoomIdx];
 
-  // Task 1: id-keyed load effect — re-runs whenever ?id changes
-  const idParam = searchParams.get('id');
+  // ── Modals ──
+  const [showTemplates,    setShowTemplates]    = useState(false);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [downloading,      setDownloading]      = useState<'free' | 'coins' | 'razorpay' | 'watermark' | null>(null);
 
-  // Guest mode load effect - creates fresh starter in memory (no localStorage)
+  // Guest load
   useEffect(() => {
-    if (user) return; // Only for guests
-    if (loadedIdRef.current) return; // Already loaded
-
-    setBooting(true);
-    const starterDraft = createStarterResume();
-    const resumeWithId: Resume = {
-      ...starterDraft,
-      _id: `guest-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    setResume(resumeWithId);
-    loadedIdRef.current = resumeWithId._id;
-    setIsDirty(false);
-    setSavedAt(null);
+    if (user) return;
+    if (loadedIdRef.current) return;
+    const draft = createStarterResume();
+    const r: Resume = { ...draft, _id: `guest-${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    setResume(r);
+    loadedIdRef.current = r._id;
     setBooting(false);
   }, [user]);
 
-  // Logged-in user load effect - uses server API
+  // Logged-in load
   useEffect(() => {
     if (!user) return;
-    // Skip if the ?id we want is already loaded
     if (idParam && loadedIdRef.current === idParam) return;
-
     let cancelled = false;
     setBooting(true);
-
-    const load = async () => {
+    (async () => {
       try {
         if (idParam) {
-          // Load a specific saved resume by its id directly — no guessing
           const result = await resumeApi.get(idParam);
           if (cancelled) return;
-          if (!result.data) throw new Error('Resume not found');
+          if (!result.data) throw new Error('Not found');
           setResume(safeResume(result.data));
           loadedIdRef.current = idParam;
         } else {
-          // No id in URL — open the first existing resume, or create a new starter
           const list = await resumeApi.list();
           if (cancelled) return;
           const first = list.data?.[0];
@@ -225,10 +185,9 @@ export function ResumeBuilder() {
             loadedIdRef.current = first._id;
             router.replace(`/resume-builder?id=${first._id}`);
           } else {
-            // No resumes exist yet — create a fresh starter
             const created = await resumeApi.create(createStarterResume());
             if (cancelled) return;
-            if (!created.data) throw new Error('Could not create resume');
+            if (!created.data) throw new Error('Could not create');
             setResume(safeResume(created.data));
             loadedIdRef.current = created.data._id;
             router.replace(`/resume-builder?id=${created.data._id}`);
@@ -237,29 +196,20 @@ export function ResumeBuilder() {
         setIsDirty(false);
         setSavedAt(null);
       } catch {
-        if (!cancelled) toast.error('Could not load your resume. Please try again.');
+        if (!cancelled) toast.error('Could not load your resume.');
       } finally {
         if (!cancelled) setBooting(false);
       }
-    };
-
-    void load();
+    })();
     return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, idParam]);
 
-  // Task 3: debounced autosave — fires 2s after last edit when isDirty (logged-in only)
+  // Autosave
   const saveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const save = useCallback(async (draft = resume, isAuto = false) => {
     if (!draft) return;
-
-    // Guest: show login prompt instead of saving
-    if (!user) {
-      if (!isAuto) setShowSavePrompt(true);
-      return;
-    }
-
-    // Logged-in: save to server
+    if (!user) { if (!isAuto) setShowSavePrompt(true); return; }
     setSaving(true);
     try {
       await resumeApi.update(draft._id, toDraft(draft));
@@ -270,74 +220,48 @@ export function ResumeBuilder() {
         firstAutosaveToastShown.current = true;
         toast.success('Resume autosaved');
       }
-    } catch {
-      toast.error('Could not save the resume');
-    } finally {
-      setSaving(false);
-    }
+    } catch { toast.error('Could not save the resume'); }
+    finally { setSaving(false); }
   }, [resume, user]);
 
   useEffect(() => {
-    if (booting || !isDirty || !resume || !user) return; // No autosave for guests
+    if (booting || !isDirty || !resume || !user) return;
     if (saveRef.current) clearTimeout(saveRef.current);
     saveRef.current = setTimeout(() => { void save(resume, true); }, 2000);
     return () => { if (saveRef.current) clearTimeout(saveRef.current); };
   }, [resume, isDirty, booting, save, user]);
 
-  // Task 4: beforeunload guard — warn when there are unsaved changes
-  // Skip when SavePromptModal is open (user is about to sign in)
   useEffect(() => {
     if (!isDirty || showSavePrompt) return;
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+    const handle = (e: BeforeUnloadEvent) => {
       if (navigationFlag.suppress) return;
-      e.preventDefault();
-      e.returnValue = '';
+      e.preventDefault(); e.returnValue = '';
     };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('beforeunload', handle);
+    return () => window.removeEventListener('beforeunload', handle);
   }, [isDirty, showSavePrompt]);
 
-  // Navigation guard for guest users with unsaved changes
-  // Note: Next.js App Router doesn't support router.events, so we handle navigation
-  // through Link click handlers and beforeunload events instead
-
-  // Mark dirty on every edit
   const update = (patch: Partial<Resume>) => {
-    setResume((current) => current ? { ...current, ...patch } : current);
+    setResume((cur) => cur ? { ...cur, ...patch } : cur);
     setIsDirty(true);
   };
   const updatePersonal = (patch: Partial<Resume['personal']>) => {
-    setResume((current) => current ? { ...current, personal: { ...current.personal, ...patch } } : current);
+    setResume((cur) => cur ? { ...cur, personal: { ...cur.personal, ...patch } } : cur);
     setIsDirty(true);
   };
 
-  // Download modal state
-  const [showDownloadModal, setShowDownloadModal] = useState(false);
-  const [downloading, setDownloading] = useState<'free' | 'coins' | 'razorpay' | 'watermark' | null>(null);
-
-  // Print without watermark: temporarily hide overlay, print, restore
+  // ── Print ──
   const printClean = () => {
     document.documentElement.classList.add('printing-clean');
     window.print();
-    // restore after print dialog closes (listen for afterprint or fallback timeout)
-    const restore = () => {
-      document.documentElement.classList.remove('printing-clean');
-      window.removeEventListener('afterprint', restore);
-    };
+    const restore = () => { document.documentElement.classList.remove('printing-clean'); window.removeEventListener('afterprint', restore); };
     window.addEventListener('afterprint', restore);
-    setTimeout(restore, 3000); // fallback
+    setTimeout(restore, 3000);
   };
 
   const handleDownload = async (method: 'free' | 'coins' | 'razorpay' | 'watermark') => {
-    if (method === 'watermark') {
-      window.print();
-      setShowDownloadModal(false);
-      return;
-    }
-    if (method === 'razorpay') {
-      toast.info('Razorpay payment coming soon! Use QCoins or buy a pack.');
-      return;
-    }
+    if (method === 'watermark') { window.print(); setShowDownloadModal(false); return; }
+    if (method === 'razorpay')  { toast.info('Razorpay coming soon!'); return; }
     if (!resume) return;
     setDownloading(method);
     try {
@@ -345,26 +269,20 @@ export function ResumeBuilder() {
       if (res.success && res.data) {
         updateUser({ ...user!, qcoins: res.data.qcoins, freeDownloadsLeft: res.data.freeDownloadsLeft });
         setShowDownloadModal(false);
-        toast.success(method === 'free' ? 'Free download used — printing now!' : '200 QCoins spent — printing now!');
+        toast.success(method === 'free' ? 'Free download — printing now!' : '200 QCoins spent — printing now!');
         setTimeout(printClean, 300);
       }
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Download failed';
-      toast.error(msg);
-    } finally {
-      setDownloading(null);
-    }
+      toast.error((err as any)?.response?.data?.message ?? 'Download failed');
+    } finally { setDownloading(null); }
   };
 
-  const exportJson = () => {    if (!resume) return;
+  const exportJson = () => {
+    if (!resume) return;
     const url = URL.createObjectURL(new Blob([JSON.stringify(toDraft(resume), null, 2)], { type: 'application/json' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${safeName(resume.title)}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
+    const a = Object.assign(document.createElement('a'), { href: url, download: `${safeName(resume.title)}.json` });
+    a.click(); URL.revokeObjectURL(url);
   };
-
   const importJson = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !resume) return;
@@ -372,75 +290,190 @@ export function ResumeBuilder() {
     reader.onload = () => {
       try {
         const imported = JSON.parse(String(reader.result));
-        if (!imported.personal || !Array.isArray(imported.education) || !Array.isArray(imported.skillGroups)) throw new Error();
+        if (!imported.personal || !Array.isArray(imported.education)) throw new Error();
         setResume(safeResume({ ...resume, ...imported, _id: resume._id, createdAt: resume.createdAt, updatedAt: resume.updatedAt }));
         setIsDirty(true);
-        toast.success('Resume data imported. Click Save to keep it.');
-      } catch {
-        toast.error('This is not a valid InvertisPrep resume file');
-      }
+        toast.success('Resume imported. Click Save to keep it.');
+      } catch { toast.error('Not a valid InvertisPrep resume file'); }
     };
     reader.readAsText(file);
     event.target.value = '';
   };
 
-  if (loading || booting || !resume) {
-    return <div className="min-h-[70vh] grid place-items-center"><Loader2 className="h-7 w-7 animate-spin text-indigo-600" /></div>;
-  }
+  // ── Drag-to-resize ──
+  const startResize = (side: 'left' | 'right') => (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX     = e.clientX;
+    const startLeft  = leftW;
+    const startRight = rightW;
+    const ws = workspaceRef.current;
 
-  // Task 3: save status indicator label
-  const SaveStatus = () => {
-    if (!user && isDirty) {
-      return <span className="flex items-center gap-1 text-xs text-amber-600 font-medium"><Clock size={12}/> Not saved — <button onClick={() => setShowSavePrompt(true)} className="underline">Sign in</button></span>;
-    }
-    if (saving) return <span className="flex items-center gap-1 text-xs text-slate-400"><Loader2 className="animate-spin" size={12}/> Saving…</span>;
-    if (!isDirty && savedAt) return <span className="flex items-center gap-1 text-xs text-slate-400"><CheckCircle2 size={12} className="text-green-500"/> Saved {savedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>;
-    if (!isDirty && !savedAt) return <span className="flex items-center gap-1 text-xs text-slate-400"><CheckCircle2 size={12} className="text-green-500"/> All changes saved</span>;
-    return <span className="flex items-center gap-1 text-xs text-amber-500"><Clock size={12}/> Unsaved changes</span>;
+    const handleEl = (e.currentTarget as HTMLElement);
+    handleEl.classList.add('rb-dragging');
+
+    const onMove = (mv: MouseEvent) => {
+      const dx = mv.clientX - startX;
+      if (side === 'left') {
+        setLeftW(Math.min(MAX_LEFT, Math.max(MIN_LEFT, startLeft + dx)));
+      } else {
+        setRightW(Math.min(MAX_RIGHT, Math.max(MIN_RIGHT, startRight - dx)));
+      }
+    };
+    const onUp = () => {
+      handleEl.classList.remove('rb-dragging');
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup',   onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup',   onUp);
   };
 
-  return (
-    <div className="bg-slate-100 min-h-screen resume-builder-shell">
-      <div className="mx-auto max-w-[1600px] px-3 py-4 sm:px-5 sm:py-6">
-        <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-white px-4 py-3 shadow-sm">
-          <div>
-            <h1 className="font-bold text-slate-900">ATS Resume Builder</h1>
-            <p className="text-xs text-slate-500">Clean, single-column content designed for easy ATS parsing.</p>
+  // Apply widths as CSS variables on the workspace element
+  const workspaceStyle: React.CSSProperties = {
+    '--rb-left-w':  `${leftW}px`,
+    '--rb-right-w': `${rightW}px`,
+  } as React.CSSProperties;
+
+  if (loading || booting || !resume) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-zinc-50">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-zinc-900 flex items-center justify-center">
+            <FileText className="h-5 w-5 text-white" />
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <SaveStatus />
-            <Link
-              className="resume-tool"
-              href="/resumes"
-              onClick={(e) => {
-                if (!user && isDirty) {
-                  e.preventDefault();
-                  setPendingNavigation('/resumes');
-                  setShowSavePrompt(true);
-                }
-              }}
-            >
-              <LayoutDashboard size={16}/> My resumes
-            </Link>
-            <button className="resume-tool" onClick={() => importRef.current?.click()}><FileUp size={16}/> Import</button>
-            <button className="resume-tool" onClick={exportJson}><Download size={16}/> Export</button>
-            <button className="resume-tool" onClick={() => {
-              if (!user) {
-                setShowSavePrompt(true);
-              } else {
-                setShowDownloadModal(true);
-              }
-            }}><Printer size={16}/> PDF</button>            <button className="resume-tool-primary" disabled={saving} onClick={() => save(resume, false)}>
-              {saving ? <Loader2 className="animate-spin" size={16}/> : <Save size={16}/>} Save
-            </button>
-            <input ref={importRef} className="hidden" type="file" accept="application/json,.json" onChange={importJson} />
-          </div>
-        </div>
-        <div className="grid gap-5 xl:grid-cols-[minmax(390px,0.82fr)_minmax(620px,1.18fr)]">
-          <ResumeEditor resume={resume} update={update} updatePersonal={updatePersonal} />
-          <ResumePreview resume={resume} />
+          <Loader2 className="h-5 w-5 animate-spin text-zinc-600" />
+          <p className="text-xs font-medium text-zinc-500 tracking-wide uppercase">Loading resume…</p>
         </div>
       </div>
+    );
+  }
+
+  // ── Save status ──
+  const SaveStatus = () => {
+    if (!user && isDirty)
+      return <button onClick={() => setShowSavePrompt(true)} className="flex items-center gap-1.5 rounded-md bg-white/10 px-2.5 py-1 text-[11px] font-medium text-amber-300 hover:bg-white/15 transition"><Clock size={10} /> Not saved — Sign in</button>;
+    if (saving)
+      return <span className="flex items-center gap-1.5 text-[11px] text-zinc-400"><Loader2 className="animate-spin" size={10} /> Saving…</span>;
+    if (!isDirty && savedAt)
+      return <span className="flex items-center gap-1.5 text-[11px] text-zinc-400"><CheckCircle2 size={10} className="text-emerald-400" /> Saved {savedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>;
+    if (!isDirty)
+      return <span className="flex items-center gap-1.5 text-[11px] text-zinc-400"><CheckCircle2 size={10} className="text-emerald-400" /> All saved</span>;
+    return <span className="flex items-center gap-1.5 text-[11px] text-amber-400"><Clock size={10} /> Unsaved</span>;
+  };
+
+  // ── Toolbar button ──
+  const TBtn = ({ onClick, icon: Icon, label, primary = false, disabled = false }: {
+    onClick?: () => void; icon: React.ElementType; label: string; primary?: boolean; disabled?: boolean;
+  }) => (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={
+        primary
+          ? 'flex items-center gap-1.5 rounded-md bg-white px-3 py-1.5 text-[11px] font-semibold text-zinc-900 hover:bg-zinc-100 transition disabled:opacity-50'
+          : 'flex items-center gap-1.5 rounded-md border border-white/15 bg-white/8 px-2.5 py-1.5 text-[11px] font-medium text-zinc-300 hover:bg-white/15 hover:text-white transition'
+      }
+    >
+      <Icon size={12} />
+      {label}
+    </button>
+  );
+
+  return (
+    <div className="rb-shell resume-builder-shell">
+
+      {/* ── Toolbar ─────────────────────────────────────────────────────── */}
+      <header className="rb-toolbar no-print">
+        {/* Brand */}
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white">
+            <FileText size={14} className="text-zinc-900" />
+          </div>
+          <div className="hidden sm:block">
+            <p className="text-[12px] font-semibold text-white leading-tight truncate max-w-[180px]">
+              {resume.title || 'Resume Builder'}
+            </p>
+            <p className="text-[10px] text-zinc-500 leading-tight">AI Resume Builder</p>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+          <SaveStatus />
+          <div className="h-4 w-px bg-white/10 mx-0.5" />
+          <Link
+            href="/resumes"
+            onClick={(e) => { if (!user && isDirty) { e.preventDefault(); setPendingNavigation('/resumes'); setShowSavePrompt(true); } }}
+            className="flex items-center gap-1.5 rounded-md border border-white/15 bg-white/8 px-2.5 py-1.5 text-[11px] font-medium text-zinc-300 hover:bg-white/15 hover:text-white transition"
+          >
+            <LayoutDashboard size={12} /> My Resumes
+          </Link>
+          <TBtn onClick={() => setShowTemplates(true)} icon={Settings2} label="Templates" />
+          <TBtn onClick={() => importRef.current?.click()} icon={FileUp} label="Import" />
+          <TBtn onClick={exportJson} icon={Download} label="Export" />
+          <TBtn onClick={() => user ? setShowDownloadModal(true) : setShowSavePrompt(true)} icon={Printer} label="PDF" />
+          <div className="h-4 w-px bg-white/10 mx-0.5" />
+          <button
+            disabled={saving}
+            onClick={() => save(resume, false)}
+            className="flex items-center gap-1.5 rounded-md bg-white px-3 py-1.5 text-[11px] font-semibold text-zinc-900 hover:bg-zinc-100 transition disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="animate-spin" size={12} /> : <Save size={12} />}
+            Save
+          </button>
+          <input ref={importRef} className="hidden" type="file" accept="application/json,.json" onChange={importJson} />
+        </div>
+      </header>
+
+      {/* ── Three-panel workspace ─────────────────────────────────────── */}
+      <div className="rb-workspace" ref={workspaceRef} style={workspaceStyle}>
+
+        {/* LEFT — AI Panel */}
+        <div className="rb-panel rb-panel-left">
+          <div className="rb-panel-header no-print">
+            <span className="rb-panel-title">AI Assistant</span>
+            <Sparkles size={12} className="text-zinc-400" />
+          </div>
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <AISidebar resume={resume} update={update} updatePersonal={updatePersonal} />
+          </div>
+        </div>
+
+        {/* Drag handle: left ↔ center */}
+        <div className="rb-drag-handle no-print" onMouseDown={startResize('left')} title="Drag to resize" />
+
+        {/* CENTER — Editor forms */}
+        <div className="rb-panel rb-panel-center">
+          <div className="rb-panel-header no-print">
+            <span className="rb-panel-title">Editor</span>
+            <span className="text-[10px] text-zinc-400 tabular-nums">
+              {resume.personal.name || 'Untitled'}
+            </span>
+          </div>
+          <ResumeEditor resume={resume} update={update} updatePersonal={updatePersonal} />
+        </div>
+
+        {/* Drag handle: center ↔ right */}
+        <div className="rb-drag-handle no-print" onMouseDown={startResize('right')} title="Drag to resize" />
+
+        {/* RIGHT — Live preview */}
+        <div className={`rb-panel rb-panel-right ${fullscreen ? 'rb-fullscreen' : ''}`}>
+          <ResumePreview
+            resume={resume}
+            zoom={zoom}
+            zoomIdx={zoomIdx}
+            zoomSteps={ZOOM_STEPS}
+            fullscreen={fullscreen}
+            onZoomIn={() => setZoomIdx((i) => Math.min(ZOOM_STEPS.length - 1, i + 1))}
+            onZoomOut={() => setZoomIdx((i) => Math.max(0, i - 1))}
+            onZoomReset={() => setZoomIdx(5)}
+            onToggleFullscreen={() => setFullscreen((f) => !f)}
+          />
+        </div>
+
+      </div>
+
+      {/* ── Modals ──────────────────────────────────────────────────────── */}
       <DownloadModal
         open={showDownloadModal}
         onClose={() => setShowDownloadModal(false)}
@@ -452,86 +485,56 @@ export function ResumeBuilder() {
       <SavePromptModal
         open={showSavePrompt}
         onOpenChange={setShowSavePrompt}
-        onSaveAndLogin={() => {
-          // Stash draft to localStorage so login page migration can pick it up
-          // Don't close the modal here — it will unmount when the page navigates
-          if (resume) stashGuestResume(toDraft(resume));
-        }}
-        onDiscard={() => {
-          // Discard changes and allow navigation
-          clearGuestResume();
-          setPendingNavigation(null);
-          setShowSavePrompt(false);
-        }}
+        onSaveAndLogin={() => { if (resume) stashGuestResume(toDraft(resume)); }}
+        onDiscard={() => { clearGuestResume(); setPendingNavigation(null); setShowSavePrompt(false); }}
       />
+      {showTemplates && (
+        <TemplatesModal
+          open={showTemplates}
+          onClose={() => setShowTemplates(false)}
+          onSelectTemplate={() => setShowTemplates(false)}
+        />
+      )}
     </div>
   );
 }
 
-// ─── DownloadModal ─────────────────────────────────────────────────────────────
-function DownloadModal({
-  open, onClose, qcoins, freeDownloadsLeft, downloading, onDownload,
-}: {
-  open: boolean;
-  onClose: () => void;
-  qcoins: number;
-  freeDownloadsLeft: number;
+// ─── Download Modal ─────────────────────────────────────────────────────────────
+function DownloadModal({ open, onClose, qcoins, freeDownloadsLeft, downloading, onDownload }: {
+  open: boolean; onClose: () => void; qcoins: number; freeDownloadsLeft: number;
   downloading: 'free' | 'coins' | 'razorpay' | 'watermark' | null;
-  onDownload: (method: 'free' | 'coins' | 'razorpay' | 'watermark') => void;
+  onDownload: (m: 'free' | 'coins' | 'razorpay' | 'watermark') => void;
 }) {
   const canFree  = freeDownloadsLeft > 0;
   const canCoins = qcoins >= 200;
 
-  const OptionButton = ({
-    method, icon, title, subtitle, badge, disabled, accent,
-  }: {
+  const Opt = ({ method, icon, title, subtitle, badge, disabled, accent }: {
     method: 'free' | 'coins' | 'razorpay' | 'watermark';
-    icon: React.ReactNode;
-    title: string;
-    subtitle: React.ReactNode;
-    badge?: string;
-    disabled?: boolean;
-    accent?: string;
+    icon: React.ReactNode; title: string; subtitle: React.ReactNode;
+    badge?: string; disabled?: boolean; accent?: string;
   }) => {
-    const isLoading = downloading === method;
+    const busy = downloading === method;
     return (
       <button
         onClick={() => !disabled && onDownload(method)}
         disabled={disabled || downloading !== null}
-        className={`group relative flex w-full items-center gap-4 rounded-xl border-2 p-4 text-left transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed
-          ${disabled
-            ? 'border-slate-100 bg-slate-50'
-            : accent === 'indigo'
-              ? 'border-indigo-200 bg-indigo-50/50 hover:border-indigo-400 hover:bg-indigo-50 hover:shadow-sm'
-              : accent === 'emerald'
-                ? 'border-emerald-200 bg-emerald-50/50 hover:border-emerald-400 hover:bg-emerald-50 hover:shadow-sm'
-                : accent === 'purple'
-                  ? 'border-purple-200 bg-purple-50/50 hover:border-purple-400 hover:bg-purple-50 hover:shadow-sm'
-                  : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
-          }`}
+        className={`group relative flex w-full items-center gap-4 rounded-xl border-2 p-4 text-left transition-all disabled:opacity-50 disabled:cursor-not-allowed
+          ${disabled ? 'border-zinc-100 bg-zinc-50'
+            : accent === 'dark' ? 'border-zinc-800 bg-zinc-900 hover:bg-zinc-800'
+            : 'border-zinc-200 bg-white hover:border-zinc-400 hover:shadow-sm'}`}
       >
         <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg
-          ${accent === 'emerald' ? 'bg-emerald-100 text-emerald-600' :
-            accent === 'indigo'  ? 'bg-indigo-100 text-indigo-600' :
-            accent === 'purple'  ? 'bg-purple-100 text-purple-600' :
-            'bg-slate-100 text-slate-500'}`}
-        >
-          {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : icon}
+          ${accent === 'dark' ? 'bg-white/10 text-white' : 'bg-zinc-100 text-zinc-700'}`}>
+          {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : icon}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <p className="font-semibold text-slate-900 text-sm">{title}</p>
-            {badge && (
-              <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-700">
-                {badge}
-              </span>
-            )}
+            <p className={`font-semibold text-sm ${accent === 'dark' ? 'text-white' : 'text-zinc-900'}`}>{title}</p>
+            {badge && <span className="rounded-full bg-zinc-900 px-2 py-0.5 text-[10px] font-bold text-white">{badge}</span>}
           </div>
-          <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>
+          <p className={`mt-0.5 text-xs ${accent === 'dark' ? 'text-zinc-400' : 'text-zinc-500'}`}>{subtitle}</p>
         </div>
-        {!disabled && downloading === null && (
-          <Download className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:text-slate-500" />
-        )}
+        {!disabled && !downloading && <Download className="h-4 w-4 shrink-0 text-zinc-300 group-hover:text-zinc-600 transition" />}
       </button>
     );
   };
@@ -540,240 +543,446 @@ function DownloadModal({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-slate-900">
-            <Printer className="h-5 w-5 text-indigo-600" />
-            Download PDF
-          </DialogTitle>
-          <DialogDescription>
-            Choose how you'd like to download your resume.
-          </DialogDescription>
+          <DialogTitle className="flex items-center gap-2"><Printer className="h-5 w-5" /> Download PDF</DialogTitle>
+          <DialogDescription>Choose how you'd like to download your resume.</DialogDescription>
         </DialogHeader>
-
-        {/* balance pill */}
-        <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs">
-          <Coins className="h-4 w-4 text-indigo-500" />
-          <span className="font-semibold text-slate-700">{qcoins.toLocaleString('en-IN')} QCoins</span>
-          <span className="mx-1 text-slate-300">·</span>
-          <Gift className="h-4 w-4 text-emerald-500" />
-          <span className="font-semibold text-slate-700">{freeDownloadsLeft} free download{freeDownloadsLeft !== 1 ? 's' : ''} left</span>
-          <Link href="/wallet" className="ml-auto flex items-center gap-1 text-indigo-600 hover:underline font-medium">
+        <div className="flex items-center gap-2 rounded-lg bg-zinc-50 border border-zinc-200 px-3 py-2 text-xs">
+          <Coins className="h-4 w-4 text-zinc-500" />
+          <span className="font-semibold text-zinc-700">{qcoins.toLocaleString('en-IN')} QCoins</span>
+          <span className="mx-1 text-zinc-300">·</span>
+          <Gift className="h-4 w-4 text-zinc-500" />
+          <span className="font-semibold text-zinc-700">{freeDownloadsLeft} free left</span>
+          <Link href="/wallet" className="ml-auto flex items-center gap-1 text-zinc-600 font-medium hover:underline">
             <Wallet className="h-3 w-3" /> Top up
           </Link>
         </div>
-
-        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Watermark-free</p>
-
         <div className="space-y-2">
-          <OptionButton
-            method="free"
-            icon={<Gift className="h-5 w-5" />}
-            title={`Use free trial ${canFree ? `(${freeDownloadsLeft} remaining)` : '(none left)'}`}
-            subtitle="Download a clean, watermark-free PDF — no coins needed."
-            badge={canFree ? 'FREE' : undefined}
-            disabled={!canFree}
-            accent="emerald"
-          />
-          <OptionButton
-            method="coins"
-            icon={<Coins className="h-5 w-5" />}
+          <Opt method="free"  icon={<Gift className="h-5 w-5" />}
+            title={`Use free trial ${canFree ? `(${freeDownloadsLeft} left)` : '(none left)'}`}
+            subtitle="Clean watermark-free PDF — no coins needed."
+            badge={canFree ? 'FREE' : undefined} disabled={!canFree} />
+          <Opt method="coins" icon={<Coins className="h-5 w-5" />}
             title={`Spend 200 QCoins ${!canCoins ? `(need ${200 - qcoins} more)` : ''}`}
-            subtitle={`You have ${qcoins.toLocaleString('en-IN')} QCoins. Each watermark-free download costs 200 QC.`}
-            disabled={!canCoins}
-            accent="indigo"
-          />
-          <OptionButton
-            method="razorpay"
-            icon={<CreditCard className="h-5 w-5" />}
+            subtitle={`You have ${qcoins.toLocaleString('en-IN')} QCoins. Each clean download = 200 QC.`}
+            disabled={!canCoins} />
+          <Opt method="razorpay" icon={<CreditCard className="h-5 w-5" />}
             title="Pay ₹19.99"
-            subtitle={<span>Razorpay coming soon. <span className="line-through text-slate-400">₹99.99</span> <span className="font-bold text-rose-500">₹19.99</span> — Limited offer!</span>}
-            accent="purple"
-          />
+            subtitle={<span>Razorpay coming soon — <span className="font-bold text-zinc-800">₹19.99</span></span>} />
         </div>
-
         <div className="relative my-1 flex items-center gap-3">
-          <div className="flex-1 border-t border-slate-200" />
-          <span className="text-xs text-slate-400">or</span>
-          <div className="flex-1 border-t border-slate-200" />
+          <div className="flex-1 border-t border-zinc-200" />
+          <span className="text-xs text-zinc-400">or</span>
+          <div className="flex-1 border-t border-zinc-200" />
         </div>
-
-        <OptionButton
-          method="watermark"
-          icon={<Sparkles className="h-5 w-5" />}
+        <Opt method="watermark" icon={<Sparkles className="h-5 w-5" />}
           title="Download with watermark"
-          subtitle="Always free. The InvertisPrep watermark will be visible on the PDF."
-        />
-
-        <p className="text-center text-[11px] text-slate-400">
-          <Shield className="mr-1 inline h-3 w-3" />
-          Watermark-free downloads are for your personal use only.
+          subtitle="Always free. InvertisPrep watermark visible on the PDF." />
+        <p className="text-center text-[11px] text-zinc-400">
+          <Shield className="mr-1 inline h-3 w-3" /> Watermark-free for personal use only.
         </p>
       </DialogContent>
     </Dialog>
   );
 }
 
-// Shared editor input styling — shadcn Input plus a clean indigo focus ring
-const inputClass = 'bg-white focus-visible:border-indigo-400 focus-visible:ring-indigo-100';
-const textareaClass = 'w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100';
+// ─── Resume Editor (center panel) ─────────────────────────────────────────────
+function ResumeEditor({ resume, update, updatePersonal }: {
+  resume: Resume;
+  update: (patch: Partial<Resume>) => void;
+  updatePersonal: (patch: Partial<Resume['personal']>) => void;
+}) {
+  const setArray = <K extends 'education' | 'experience' | 'projects' | 'skillGroups' | 'achievements' | 'languages' | 'certifications'>(
+    key: K, value: Resume[K]
+  ) => update({ [key]: value } as Partial<Resume>);
 
-function ResumeEditor({ resume, update, updatePersonal }: { resume: Resume; update: (patch: Partial<Resume>) => void; updatePersonal: (patch: Partial<Resume['personal']>) => void }) {
-  const setArray = <K extends 'education' | 'experience' | 'projects' | 'skillGroups' | 'achievements' | 'languages' | 'certifications'>(key: K, value: Resume[K]) => update({ [key]: value } as Partial<Resume>);
-  return <aside className="no-print resume-editor relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-    {/* top accent line */}
-    <div className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-indigo-500 via-violet-500 to-sky-500" />
-    <Spotlight
-      className="absolute inset-0 overflow-hidden"
-      gradientFirst="radial-gradient(68.54% 68.72% at 50% 0%, rgba(99,102,241,0.10) 0%, transparent 50.11%)"
-      gradientSecond="radial-gradient(50% 50% at 50% 50%, rgba(99,102,241,0.05) 0%, transparent 50.11%)"
-      gradientThird="radial-gradient(80% 60% at 50% 0%, rgba(139,92,246,0.08) 0%, transparent 50%)"
-    />
-    <div className="relative p-4 sm:p-5">
-      <div className="mb-5">
-        <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Resume title</Label>
-        <Input className={`mt-1.5 ${inputClass}`} value={resume.title} onChange={(e) => update({ title: e.target.value })} placeholder="My Resume" />
+  return (
+    <div className="rb-editor-scroll">
+      {/* Resume title */}
+      <div className="rb-editor-section">
+        <div className="rb-editor-section-header">
+          <span className="rb-section-dot" />
+          <span className="rb-section-title">Resume Title</span>
+        </div>
+        <div className="px-4 pb-4 pt-2">
+          <Input className={inputCls} value={resume.title} onChange={(e) => update({ title: e.target.value })} placeholder="My Resume" />
+        </div>
       </div>
-      <EditorSection title="Personal information">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <EditorInput label="Full name" value={resume.personal.name} onChange={(value) => updatePersonal({ name: value })} />
-          <EditorInput label="Professional title" value={resume.personal.headline} onChange={(value) => updatePersonal({ headline: value })} />
-          <EditorInput label="Phone" value={resume.personal.phone} onChange={(value) => updatePersonal({ phone: value })} />
-          <EditorInput label="Email" type="email" value={resume.personal.email} onChange={(value) => updatePersonal({ email: value })} />
-          <EditorInput label="Location" value={resume.personal.location} onChange={(value) => updatePersonal({ location: value })} />
+
+      <EditorSection title="Personal Information">
+        <div className="grid gap-2.5 sm:grid-cols-2">
+          <EInput label="Full Name"          value={resume.personal.name}     onChange={(v) => updatePersonal({ name: v })} />
+          <EInput label="Professional Title" value={resume.personal.headline} onChange={(v) => updatePersonal({ headline: v })} />
+          <EInput label="Phone"              value={resume.personal.phone}    onChange={(v) => updatePersonal({ phone: v })} />
+          <EInput label="Email" type="email" value={resume.personal.email}   onChange={(v) => updatePersonal({ email: v })} />
+          <EInput label="Location"           value={resume.personal.location} onChange={(v) => updatePersonal({ location: v })} className="sm:col-span-2" />
         </div>
       </EditorSection>
-      <EditorSection title="Social links" action={() => updatePersonal({ links: [emptyLink(), ...resume.personal.links] })}>
-        {resume.personal.links.map((link, index) => <div className="mb-3 grid grid-cols-[1fr_1fr_auto] items-center gap-2" key={link._id || index}>
-          <Input className={inputClass} placeholder="GitHub" value={link.label} onChange={(e) => updatePersonal({ links: resume.personal.links.map((entry, i) => i === index ? { ...entry, label: e.target.value } : entry) })} />
-          <Input className={inputClass} placeholder="github.com/name" value={link.url} onChange={(e) => updatePersonal({ links: resume.personal.links.map((entry, i) => i === index ? { ...entry, url: e.target.value } : entry) })} />
-          <RemoveButton onClick={() => updatePersonal({ links: resume.personal.links.filter((_, i) => i !== index) })} />
-        </div>)}
+
+      <EditorSection title="Social Links" action={() => updatePersonal({ links: [emptyLink(), ...resume.personal.links] })}>
+        {resume.personal.links.map((link, i) => (
+          <div key={link._id || i} className="mb-2 grid grid-cols-[1fr_1.4fr_auto] items-center gap-1.5">
+            <Input className={inputCls} placeholder="Label" value={link.label}
+              onChange={(e) => updatePersonal({ links: resume.personal.links.map((l, j) => j === i ? { ...l, label: e.target.value } : l) })} />
+            <Input className={inputCls} placeholder="URL" value={link.url}
+              onChange={(e) => updatePersonal({ links: resume.personal.links.map((l, j) => j === i ? { ...l, url: e.target.value } : l) })} />
+            <DelBtn onClick={() => updatePersonal({ links: resume.personal.links.filter((_, j) => j !== i) })} />
+          </div>
+        ))}
       </EditorSection>
-      <EditorSection title="Summary"><textarea className={`${textareaClass} min-h-28`} value={resume.summary} onChange={(e) => update({ summary: e.target.value })} placeholder="Write a concise, achievement-focused professional summary." /></EditorSection>
+
+      <EditorSection title="Professional Summary">
+        <textarea className={`${textareaCls} min-h-[6.5rem]`} value={resume.summary}
+          onChange={(e) => update({ summary: e.target.value })}
+          placeholder="Write a concise, achievement-focused professional summary…" />
+      </EditorSection>
+
       <EditorSection title="Education" action={() => setArray('education', [emptyEducation(), ...resume.education])}>
-        {resume.education.map((item, index) => <div key={item._id || index} className="editor-card"><div className="grid gap-2 sm:grid-cols-2">
-          <EditorInput compact placeholder="University / school" value={item.institution} onChange={(institution) => setArray('education', resume.education.map((entry, i) => i === index ? { ...entry, institution } : entry))} />
-          <EditorInput compact placeholder="Degree / course" value={item.degree} onChange={(degree) => setArray('education', resume.education.map((entry, i) => i === index ? { ...entry, degree } : entry))} />
-          <EditorInput compact type="month" value={item.startDate} onChange={(startDate) => setArray('education', resume.education.map((entry, i) => i === index ? { ...entry, startDate } : entry))} />
-          <EditorInput compact type="month" value={item.endDate} onChange={(endDate) => setArray('education', resume.education.map((entry, i) => i === index ? { ...entry, endDate } : entry))} />
-        </div><RemoveButton onClick={() => setArray('education', resume.education.filter((_, i) => i !== index))} /></div>)}
+        {resume.education.map((item, i) => (
+          <div key={item._id || i} className="rb-card">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <EInput compact placeholder="University / School" value={item.institution} onChange={(v) => setArray('education', resume.education.map((e, j) => j === i ? { ...e, institution: v } : e))} />
+              <EInput compact placeholder="Degree / Course"     value={item.degree}      onChange={(v) => setArray('education', resume.education.map((e, j) => j === i ? { ...e, degree: v } : e))} />
+              <EInput compact type="month" value={item.startDate} onChange={(v) => setArray('education', resume.education.map((e, j) => j === i ? { ...e, startDate: v } : e))} />
+              <EInput compact type="month" value={item.endDate}   onChange={(v) => setArray('education', resume.education.map((e, j) => j === i ? { ...e, endDate: v } : e))} />
+            </div>
+            <div className="mt-2 flex justify-end"><DelBtn onClick={() => setArray('education', resume.education.filter((_, j) => j !== i))} /></div>
+          </div>
+        ))}
       </EditorSection>
-      <EditorSection title="Work experience" action={() => setArray('experience', [emptyExperience(), ...resume.experience])}>
-        {resume.experience.map((item, index) => <ExperienceEditor key={item._id || index} item={item} onChange={(next) => setArray('experience', resume.experience.map((entry, i) => i === index ? next : entry))} onRemove={() => setArray('experience', resume.experience.filter((_, i) => i !== index))} />)}
+
+      <EditorSection title="Work Experience" action={() => setArray('experience', [emptyExperience(), ...resume.experience])}>
+        {resume.experience.map((item, i) => (
+          <ExperienceEditor key={item._id || i} item={item}
+            onChange={(next) => setArray('experience', resume.experience.map((e, j) => j === i ? next : e))}
+            onRemove={() => setArray('experience', resume.experience.filter((_, j) => j !== i))} />
+        ))}
       </EditorSection>
+
       <EditorSection title="Projects" action={() => setArray('projects', [emptyProject(), ...resume.projects])}>
-        {resume.projects.map((item, index) => <ProjectEditor key={item._id || index} item={item} onChange={(next) => setArray('projects', resume.projects.map((entry, i) => i === index ? next : entry))} onRemove={() => setArray('projects', resume.projects.filter((_, i) => i !== index))} />)}
+        {resume.projects.map((item, i) => (
+          <ProjectEditor key={item._id || i} item={item}
+            onChange={(next) => setArray('projects', resume.projects.map((e, j) => j === i ? next : e))}
+            onRemove={() => setArray('projects', resume.projects.filter((_, j) => j !== i))} />
+        ))}
       </EditorSection>
-      <EditorSection title="Skills" action={() => setArray('skillGroups', [{ title: 'New Skill Group', items: [] }, ...resume.skillGroups])}>
-        {resume.skillGroups.map((group, index) => <div className="editor-card" key={group._id || index}><div className="flex gap-2"><Input className={inputClass} value={group.title} onChange={(e) => setArray('skillGroups', resume.skillGroups.map((entry, i) => i === index ? { ...entry, title: e.target.value } : entry))} /><RemoveButton onClick={() => setArray('skillGroups', resume.skillGroups.filter((_, i) => i !== index))} /></div><TagEditor values={group.items} onChange={(items) => setArray('skillGroups', resume.skillGroups.map((entry, i) => i === index ? { ...entry, items } : entry))} /></div>)}
+
+      <EditorSection title="Skills" action={() => setArray('skillGroups', [{ title: 'New Group', items: [] }, ...resume.skillGroups])}>
+        {resume.skillGroups.map((group, i) => (
+          <div key={group._id || i} className="rb-card">
+            <div className="mb-2 flex gap-1.5">
+              <Input className={inputCls} value={group.title}
+                onChange={(e) => setArray('skillGroups', resume.skillGroups.map((g, j) => j === i ? { ...g, title: e.target.value } : g))} />
+              <DelBtn onClick={() => setArray('skillGroups', resume.skillGroups.filter((_, j) => j !== i))} />
+            </div>
+            <TagEditor values={group.items}
+              onChange={(items) => setArray('skillGroups', resume.skillGroups.map((g, j) => j === i ? { ...g, items } : g))} />
+          </div>
+        ))}
       </EditorSection>
-      <EditorSection title="Achievements"><TagEditor values={resume.achievements} onChange={(achievements) => setArray('achievements', achievements)} /></EditorSection>
-      <EditorSection title="Languages"><TagEditor values={resume.languages} onChange={(languages) => setArray('languages', languages)} /></EditorSection>
-      <EditorSection title="Certifications"><TagEditor values={resume.certifications} onChange={(certifications) => setArray('certifications', certifications)} /></EditorSection>
+
+      <EditorSection title="Achievements">
+        <TagEditor values={resume.achievements} onChange={(v) => setArray('achievements', v)} />
+      </EditorSection>
+      <EditorSection title="Languages">
+        <TagEditor values={resume.languages} onChange={(v) => setArray('languages', v)} />
+      </EditorSection>
+      <EditorSection title="Certifications">
+        <TagEditor values={resume.certifications} onChange={(v) => setArray('certifications', v)} />
+      </EditorSection>
+      <div className="h-10" />
     </div>
-  </aside>;
+  );
 }
 
+// ─── Editor helpers ────────────────────────────────────────────────────────────
 function EditorSection({ title, children, action }: { title: string; children: React.ReactNode; action?: () => void }) {
+  const [open, setOpen] = useState(true);
   return (
-    <section className="mb-6">
-      <div className="mb-2.5 flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-[13px] font-bold uppercase tracking-wider text-slate-600">
-          <span className="h-3.5 w-1 rounded-full bg-gradient-to-b from-indigo-500 to-violet-500" />
-          {title}
-        </h2>
-        {action && (
-          <Button type="button" onClick={action} variant="outline" size="sm" className="h-7 gap-1 border-slate-200 px-2 text-xs font-semibold text-slate-600 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600">
-            <Plus size={14} /> Add
-          </Button>
-        )}
+    <section className="rb-editor-section">
+      <div className="rb-editor-section-header" onClick={() => setOpen(!open)} role="button">
+        <span className="rb-section-dot" />
+        <span className="rb-section-title">{title}</span>
+        <div className="ml-auto flex items-center gap-2">
+          {action && open && (
+            <button type="button" onClick={(e) => { e.stopPropagation(); action(); }}
+              className="flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-zinc-500 hover:border-zinc-400 hover:text-zinc-800 transition">
+              <Plus size={10} /> Add
+            </button>
+          )}
+          {open ? <ChevronUp size={12} className="text-zinc-400" /> : <ChevronDown size={12} className="text-zinc-400" />}
+        </div>
       </div>
-      {children}
+      {open && <div className="px-4 pb-4 pt-1">{children}</div>}
     </section>
   );
 }
 
-function EditorInput({ label, compact, ...props }: { label?: string; compact?: boolean; value: string; onChange: (value: string) => void; type?: string; placeholder?: string }) {
+function EInput({ label, compact, className, ...props }: {
+  label?: string; compact?: boolean; className?: string;
+  value: string; onChange: (v: string) => void; type?: string; placeholder?: string;
+}) {
   return (
-    <label className="block">
-      {label && <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">{label}</span>}
-      <Input className={`${inputClass} ${compact ? 'h-8 text-sm' : ''}`} {...props} onChange={(e) => props.onChange(e.target.value)} />
+    <label className={`block ${className ?? ''}`}>
+      {label && <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-zinc-400">{label}</span>}
+      <Input className={`${inputCls} ${compact ? 'h-8' : ''}`} {...props} onChange={(e) => props.onChange(e.target.value)} />
     </label>
   );
 }
 
-function RemoveButton({ onClick }: { onClick: () => void }) {
-  return <Button type="button" onClick={onClick} size="icon-sm" variant="ghost" aria-label="Remove" className="text-slate-400 hover:bg-red-50 hover:text-red-600"><Trash2 size={15} /></Button>;
+function DelBtn({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} aria-label="Remove"
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-zinc-400 hover:bg-red-50 hover:text-red-500 transition">
+      <Trash2 size={13} />
+    </button>
+  );
 }
 
-function TagEditor({ values, onChange }: { values: string[]; onChange: (values: string[]) => void }) {
+function TagEditor({ values, onChange }: { values: string[]; onChange: (v: string[]) => void }) {
   return (
-    <div className="mt-2 space-y-2">
-      {values.map((value, index) => <div className="flex gap-2" key={index}><Input className={inputClass} value={value} placeholder="Add an item" onChange={(e) => onChange(values.map((entry, i) => i === index ? e.target.value : entry))} /><RemoveButton onClick={() => onChange(values.filter((_, i) => i !== index))} /></div>)}
-      <Button type="button" onClick={() => onChange(['', ...values])} variant="outline" size="sm" className="gap-1 border-slate-200 text-xs font-semibold text-slate-600 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600"><Plus size={14} /> Add item</Button>
+    <div className="space-y-2">
+      {values.map((v, i) => (
+        <div key={i} className="flex gap-1.5">
+          <Input className={inputCls} value={v} placeholder="Add an item"
+            onChange={(e) => onChange(values.map((x, j) => j === i ? e.target.value : x))} />
+          <DelBtn onClick={() => onChange(values.filter((_, j) => j !== i))} />
+        </div>
+      ))}
+      <button type="button" onClick={() => onChange(['', ...values])}
+        className="flex items-center gap-1.5 rounded-lg border border-dashed border-zinc-300 px-3 py-1.5 text-[11px] font-medium text-zinc-500 hover:border-zinc-600 hover:bg-zinc-50 hover:text-zinc-700 transition">
+        <Plus size={11} /> Add item
+      </button>
     </div>
   );
 }
 
-function ExperienceEditor({ item, onChange, onRemove }: { item: ResumeExperience; onChange: (item: ResumeExperience) => void; onRemove: () => void }) {
-  return <div className="editor-card"><div className="grid gap-2 sm:grid-cols-2"><EditorInput compact placeholder="Company" value={item.company} onChange={(company) => onChange({ ...item, company })} /><EditorInput compact placeholder="Role" value={item.role} onChange={(role) => onChange({ ...item, role })} /><EditorInput compact type="month" value={item.startDate} onChange={(startDate) => onChange({ ...item, startDate })} /><EditorInput compact type="month" value={item.endDate} onChange={(endDate) => onChange({ ...item, endDate })} /></div><textarea className={`${textareaClass} mt-2 min-h-20`} value={item.description} placeholder="Company or role description (optional)" onChange={(e) => onChange({ ...item, description: e.target.value })} /><p className="mt-2 text-xs font-semibold text-slate-600">Achievements — one item per line</p><textarea className={`${textareaClass} mt-1 min-h-24`} value={item.achievements.join('\n')} onChange={(e) => onChange({ ...item, achievements: e.target.value.split('\n') })} /><RemoveButton onClick={onRemove} /></div>;
+function ExperienceEditor({ item, onChange, onRemove }: { item: ResumeExperience; onChange: (i: ResumeExperience) => void; onRemove: () => void }) {
+  return (
+    <div className="rb-card">
+      <div className="grid gap-2 sm:grid-cols-2">
+        <EInput compact placeholder="Company"   value={item.company}   onChange={(v) => onChange({ ...item, company: v })} />
+        <EInput compact placeholder="Role"      value={item.role}      onChange={(v) => onChange({ ...item, role: v })} />
+        <EInput compact type="month" value={item.startDate} onChange={(v) => onChange({ ...item, startDate: v })} />
+        <EInput compact type="month" value={item.endDate}   onChange={(v) => onChange({ ...item, endDate: v })} />
+      </div>
+      <textarea className={`${textareaCls} mt-2.5 min-h-[4rem]`} value={item.description} placeholder="Company / role description (optional)"
+        onChange={(e) => onChange({ ...item, description: e.target.value })} />
+      <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">Key Achievements</p>
+      <textarea className={`${textareaCls} mt-1 min-h-[5rem]`} value={item.achievements.join('\n')} placeholder="One achievement per line…"
+        onChange={(e) => onChange({ ...item, achievements: e.target.value.split('\n') })} />
+      <div className="mt-2 flex justify-end"><DelBtn onClick={onRemove} /></div>
+    </div>
+  );
 }
 
-function ProjectEditor({ item, onChange, onRemove }: { item: ResumeProject; onChange: (item: ResumeProject) => void; onRemove: () => void }) {
-  return <div className="editor-card"><div className="grid gap-2 sm:grid-cols-2"><EditorInput compact placeholder="Project name" value={item.name} onChange={(name) => onChange({ ...item, name })} /><EditorInput compact placeholder="Project URL" value={item.url} onChange={(url) => onChange({ ...item, url })} /><EditorInput compact type="month" value={item.startDate} onChange={(startDate) => onChange({ ...item, startDate })} /><EditorInput compact type="month" value={item.endDate} onChange={(endDate) => onChange({ ...item, endDate })} /></div><textarea className={`${textareaClass} mt-2 min-h-20`} value={item.description} placeholder="Project description" onChange={(e) => onChange({ ...item, description: e.target.value })} /><p className="mt-2 text-xs font-semibold text-slate-600">Achievements — one item per line</p><textarea className={`${textareaClass} mt-1 min-h-24`} value={item.achievements.join('\n')} onChange={(e) => onChange({ ...item, achievements: e.target.value.split('\n') })} /><RemoveButton onClick={onRemove} /></div>;
+function ProjectEditor({ item, onChange, onRemove }: { item: ResumeProject; onChange: (i: ResumeProject) => void; onRemove: () => void }) {
+  return (
+    <div className="rb-card">
+      <div className="grid gap-2 sm:grid-cols-2">
+        <EInput compact placeholder="Project Name" value={item.name}      onChange={(v) => onChange({ ...item, name: v })} />
+        <EInput compact placeholder="URL"          value={item.url}       onChange={(v) => onChange({ ...item, url: v })} />
+        <EInput compact type="month" value={item.startDate} onChange={(v) => onChange({ ...item, startDate: v })} />
+        <EInput compact type="month" value={item.endDate}   onChange={(v) => onChange({ ...item, endDate: v })} />
+      </div>
+      <textarea className={`${textareaCls} mt-2.5 min-h-[4rem]`} value={item.description} placeholder="Project description"
+        onChange={(e) => onChange({ ...item, description: e.target.value })} />
+      <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">Key Achievements</p>
+      <textarea className={`${textareaCls} mt-1 min-h-[5rem]`} value={item.achievements.join('\n')} placeholder="One achievement per line…"
+        onChange={(e) => onChange({ ...item, achievements: e.target.value.split('\n') })} />
+      <div className="mt-2 flex justify-end"><DelBtn onClick={onRemove} /></div>
+    </div>
+  );
 }
 
-function ResumePreview({ resume }: { resume: Resume }) {
+// ─── Resume Preview (right panel) ─────────────────────────────────────────────
+function ResumePreview({
+  resume, zoom, zoomIdx, zoomSteps, fullscreen,
+  onZoomIn, onZoomOut, onZoomReset, onToggleFullscreen,
+}: {
+  resume: Resume;
+  zoom: number;
+  zoomIdx: number;
+  zoomSteps: number[];
+  fullscreen: boolean;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onZoomReset: () => void;
+  onToggleFullscreen: () => void;
+}) {
   const p = resume.personal;
-  const hasLeft = resume.summary || resume.education.length || resume.skillGroups.some((group) => group.items.some(Boolean)) || resume.achievements.some(Boolean) || resume.languages.some(Boolean) || resume.certifications.some(Boolean);
-
-  // Enough repeated tiles to fill the diagonal overlay at any scroll position
-  const watermarkTiles = Array.from({ length: 60 });
+  const hasLeft = resume.summary || resume.education.length
+    || resume.skillGroups.some((g) => g.items.some(Boolean))
+    || resume.achievements.some(Boolean) || resume.languages.some(Boolean)
+    || resume.certifications.some(Boolean);
+  const tiles = Array.from({ length: 60 });
 
   return (
-    <section className="resume-preview-wrap relative overflow-auto rounded-xl bg-slate-200 p-3 shadow-inner sm:p-5 select-none">
-      {/* Print-only centred watermark */}
-      <div className="resume-print-watermark" aria-hidden="true">INVERTISPREP</div>
-
-      <article
-        className="resume-page mx-auto bg-white text-black shadow-xl"
-        onCopy={(e) => e.preventDefault()}
-        onCut={(e) => e.preventDefault()}
-      >
-        {/* Diagonal watermark grid — inside the page so it covers all content when scrolling */}
-        <div className="resume-preview-watermark" aria-hidden="true">
-          <div className="resume-preview-watermark-inner">
-            {watermarkTiles.map((_, i) => (
-              <span key={i}>INVERTISPREP</span>
-            ))}
-          </div>
+    <div className="rb-preview-scroll">
+      {/* Preview header */}
+      <div className="rb-preview-header no-print">
+        <div className="flex items-center gap-2">
+          <Eye size={11} className="text-zinc-400" />
+          <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Live Preview</span>
         </div>
-    <header className="border-b border-slate-300 pb-3 text-center">
-      <h1 className="text-[22px] font-bold uppercase tracking-wide">{p.name || 'Your Name'}</h1>
-      {p.headline && <p className="mt-0.5 text-[15px]">{p.headline}</p>}
-      <div className="mt-2 flex flex-wrap justify-center gap-x-3 gap-y-1 text-[11px]">{p.phone && <span>{p.phone}</span>}{p.email && <span>{p.email}</span>}{p.location && <span>{p.location}</span>}</div>
-      {p.links.some((link) => link.url) && <div className="mt-1.5 flex flex-wrap justify-center gap-x-3 gap-y-1 text-[10px]">{p.links.filter((link) => link.url).map((link, i) => <span key={link._id || i}>{link.label ? `${link.label}: ` : ''}{link.url.replace(/^https?:\/\//, '')}</span>)}</div>}
-    </header>
-    <div className={hasLeft && (resume.experience.length || resume.projects.length) ? 'grid grid-cols-[31%_1fr] gap-7 pt-4' : 'pt-4'}>
-      {hasLeft && <aside>
-        {resume.summary && <PreviewSection title="Summary"><p>{resume.summary}</p></PreviewSection>}
-        {resume.education.length > 0 && <PreviewSection title="Education">{resume.education.map((item, i) => <div className="mb-3" key={item._id || i}><p className="font-bold">{item.institution}</p><p>{item.degree}</p><DateLine start={item.startDate} end={item.endDate}/></div>)}</PreviewSection>}
-        {resume.skillGroups.filter((group) => group.items.some(Boolean)).map((group, i) => <PreviewSection key={group._id || i} title={group.title}><p>{group.items.filter(Boolean).join(', ')}</p></PreviewSection>)}
-        {resume.achievements.some(Boolean) && <PreviewSection title="Achievements"><ul>{resume.achievements.filter(Boolean).map((item, i) => <li key={i}>• {item}</li>)}</ul></PreviewSection>}
-        {resume.languages.some(Boolean) && <PreviewSection title="Languages"><p>{resume.languages.filter(Boolean).join(', ')}</p></PreviewSection>}
-        {resume.certifications.some(Boolean) && <PreviewSection title="Certifications"><ul>{resume.certifications.filter(Boolean).map((item, i) => <li key={i}>• {item}</li>)}</ul></PreviewSection>}
-      </aside>}
-      {(resume.experience.length || resume.projects.length) ? <main>
-        {resume.experience.length > 0 && <PreviewSection title="Work Experience">{resume.experience.map((item, i) => <ExperiencePreview key={item._id || i} item={item}/>)}</PreviewSection>}
-        {resume.projects.length > 0 && <PreviewSection title="Projects">{resume.projects.map((item, i) => <div className="mb-4" key={item._id || i}><div className="flex justify-between gap-3"><p className="font-bold">{item.name}</p><DateLine start={item.startDate} end={item.endDate}/></div>{item.url && <p className="text-[10px]">{item.url}</p>}{item.description && <p className="mt-1">{item.description}</p>}<AchievementList items={item.achievements}/></div>)}</PreviewSection>}
-      </main> : null}
+
+        {/* Zoom cluster + fullscreen */}
+        <div className="flex items-center gap-2">
+          <div className="rb-zoom-cluster">
+            <button className="rb-zoom-btn" onClick={onZoomOut} disabled={zoomIdx === 0} title="Zoom out">
+              <Minus size={12} />
+            </button>
+            <button className="rb-zoom-label" onClick={onZoomReset} title="Reset zoom" style={{ cursor: 'pointer', border: 'none', background: 'transparent' }}>
+              {zoom}%
+            </button>
+            <button className="rb-zoom-btn" onClick={onZoomIn} disabled={zoomIdx === zoomSteps.length - 1} title="Zoom in">
+              <Plus size={12} />
+            </button>
+          </div>
+
+          <button
+            onClick={onToggleFullscreen}
+            className="flex items-center justify-center w-7 h-7 rounded-lg border border-zinc-200 bg-white text-zinc-500 hover:border-zinc-800 hover:text-zinc-900 transition"
+            title={fullscreen ? 'Exit fullscreen' : 'Fullscreen preview'}
+          >
+            {fullscreen ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+          </button>
+        </div>
+      </div>
+
+      {/* A4 stage */}
+      <div className="rb-preview-stage">
+        {/* Print watermark */}
+        <div className="resume-print-watermark" aria-hidden="true">INVERTISPREP</div>
+
+        <div style={{
+          transformOrigin: 'top center',
+          transform: `scale(${zoom / 100})`,
+          // Collapse the phantom space left behind by CSS scale at zoom < 100
+          ...(zoom !== 100 && { marginBottom: `calc((${zoom / 100} - 1) * 11.69in)` }),
+        }}>
+          <article
+            className="resume-page mx-auto bg-white text-black shadow-2xl"
+            onCopy={(e) => e.preventDefault()}
+            onCut={(e) => e.preventDefault()}
+          >
+            {/* Diagonal watermark */}
+            <div className="resume-preview-watermark" aria-hidden="true">
+              <div className="resume-preview-watermark-inner">
+                {tiles.map((_, i) => <span key={i}>INVERTISPREP</span>)}
+              </div>
+            </div>
+
+            <header className="border-b border-zinc-300 pb-3 text-center">
+              <h1 className="text-[22px] font-bold uppercase tracking-wide">{p.name || 'Your Name'}</h1>
+              {p.headline && <p className="mt-0.5 text-[15px]">{p.headline}</p>}
+              <div className="mt-2 flex flex-wrap justify-center gap-x-3 gap-y-1 text-[11px]">
+                {p.phone    && <span>{p.phone}</span>}
+                {p.email    && <span>{p.email}</span>}
+                {p.location && <span>{p.location}</span>}
+              </div>
+              {p.links.some((l) => l.url) && (
+                <div className="mt-1.5 flex flex-wrap justify-center gap-x-3 gap-y-1 text-[10px]">
+                  {p.links.filter((l) => l.url).map((l, i) => (
+                    <span key={l._id || i}>{l.label ? `${l.label}: ` : ''}{l.url.replace(/^https?:\/\//, '')}</span>
+                  ))}
+                </div>
+              )}
+            </header>
+
+            <div className={hasLeft && (resume.experience.length || resume.projects.length) ? 'grid grid-cols-[31%_1fr] gap-7 pt-4' : 'pt-4'}>
+              {hasLeft && (
+                <aside>
+                  {resume.summary && <PSection title="Summary"><p>{resume.summary}</p></PSection>}
+                  {resume.education.length > 0 && (
+                    <PSection title="Education">
+                      {resume.education.map((e, i) => (
+                        <div key={e._id || i} className="mb-3">
+                          <p className="font-bold">{e.institution}</p>
+                          <p>{e.degree}</p>
+                          <DateLine start={e.startDate} end={e.endDate} />
+                        </div>
+                      ))}
+                    </PSection>
+                  )}
+                  {resume.skillGroups.filter((g) => g.items.some(Boolean)).map((g, i) => (
+                    <PSection key={g._id || i} title={g.title}><p>{g.items.filter(Boolean).join(', ')}</p></PSection>
+                  ))}
+                  {resume.achievements.some(Boolean) && (
+                    <PSection title="Achievements">
+                      <ul>{resume.achievements.filter(Boolean).map((a, i) => <li key={i}>• {a}</li>)}</ul>
+                    </PSection>
+                  )}
+                  {resume.languages.some(Boolean) && (
+                    <PSection title="Languages"><p>{resume.languages.filter(Boolean).join(', ')}</p></PSection>
+                  )}
+                  {resume.certifications.some(Boolean) && (
+                    <PSection title="Certifications">
+                      <ul>{resume.certifications.filter(Boolean).map((c, i) => <li key={i}>• {c}</li>)}</ul>
+                    </PSection>
+                  )}
+                </aside>
+              )}
+
+              {(resume.experience.length || resume.projects.length) ? (
+                <main>
+                  {resume.experience.length > 0 && (
+                    <PSection title="Work Experience">
+                      {resume.experience.map((item, i) => <ExpPreview key={item._id || i} item={item} />)}
+                    </PSection>
+                  )}
+                  {resume.projects.length > 0 && (
+                    <PSection title="Projects">
+                      {resume.projects.map((item, i) => (
+                        <div key={item._id || i} className="mb-4">
+                          <div className="flex justify-between gap-3">
+                            <p className="font-bold">{item.name}</p>
+                            <DateLine start={item.startDate} end={item.endDate} />
+                          </div>
+                          {item.url && <p className="text-[10px]">{item.url}</p>}
+                          {item.description && <p className="mt-1">{item.description}</p>}
+                          <AchList items={item.achievements} />
+                        </div>
+                      ))}
+                    </PSection>
+                  )}
+                </main>
+              ) : null}
+            </div>
+            <footer className="resume-watermark">Made with www.invertisprep.in</footer>
+          </article>
+        </div>
+      </div>
     </div>
-    <footer className="resume-watermark">Made with www.invertisprep.in</footer>
-      </article>
+  );
+}
+
+// ─── Preview helpers ──────────────────────────────────────────────────────────
+function PSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="mb-4">
+      <h2 className="mb-1 border-b-2 border-zinc-300 pb-0.5 text-[15px] font-bold">{title}</h2>
+      <div className="resume-content">{children}</div>
     </section>
   );
 }
-
-function PreviewSection({ title, children }: { title: string; children: React.ReactNode }) { return <section className="mb-4"><h2 className="mb-1 border-b-2 border-slate-300 pb-0.5 text-[15px] font-bold">{title}</h2><div className="resume-content">{children}</div></section>; }
-function DateLine({ start, end }: { start: string; end: string }) { const text = [formatDate(start), formatDate(end)].filter(Boolean).join(' — '); return text ? <span className="shrink-0 whitespace-nowrap text-[11px]">{text}</span> : null; }
-function AchievementList({ items }: { items: string[] }) { const values = items.filter(Boolean); return values.length ? <ul className="mt-1 list-disc pl-4">{values.map((item, i) => <li key={i}>{item}</li>)}</ul> : null; }
-function ExperiencePreview({ item }: { item: ResumeExperience }) { return <div className="mb-4"><div className="flex justify-between gap-3"><p className="font-bold">{item.company}</p><DateLine start={item.startDate} end={item.endDate}/></div><p className="font-semibold">{item.role}</p>{item.description && <p className="mt-1">{item.description}</p>}<AchievementList items={item.achievements}/></div>; }
+function DateLine({ start, end }: { start: string; end: string }) {
+  const text = [formatDate(start), formatDate(end)].filter(Boolean).join(' — ');
+  return text ? <span className="shrink-0 whitespace-nowrap text-[11px]">{text}</span> : null;
+}
+function AchList({ items }: { items: string[] }) {
+  const vals = items.filter(Boolean);
+  return vals.length ? <ul className="mt-1 list-disc pl-4">{vals.map((v, i) => <li key={i}>{v}</li>)}</ul> : null;
+}
+function ExpPreview({ item }: { item: ResumeExperience }) {
+  return (
+    <div className="mb-4">
+      <div className="flex justify-between gap-3">
+        <p className="font-bold">{item.company}</p>
+        <DateLine start={item.startDate} end={item.endDate} />
+      </div>
+      <p className="font-semibold">{item.role}</p>
+      {item.description && <p className="mt-1">{item.description}</p>}
+      <AchList items={item.achievements} />
+    </div>
+  );
+}
