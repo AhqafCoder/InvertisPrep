@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { optimizeAvatar } from '@/lib/avatar';
 import {
   buildCanonicalLoginUrl,
+  isAuthPage,
   isSafeReturnPath,
   pickLoginParams,
   shouldTransitionAuthHost,
@@ -66,7 +67,7 @@ export default function LoginPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const handledCallbackRef = useRef(false);
   const router = useRouter();
-  const { login, updateUser } = useAuth();
+  const { login, updateUser, user, loading: authLoading } = useAuth();
 
   const [mode, setMode] = useState<'student' | 'admin'>('student');
   const [loading, setLoading] = useState(false);
@@ -90,18 +91,36 @@ export default function LoginPage() {
     setIsWebViewAuthFlow(params.get('webview') === '1' || params.get('mobile') === '1');
   }, []);
 
-  // Surface NextAuth OAuth errors (e.g. ?error=OAuthCallback after a failed
-  // round-trip) instead of silently re-showing an empty login form.
+  // Where to send the user after a successful login: an explicit ?returnUrl=
+  // wins; otherwise the last page they were on while logged out (captured by
+  // AuthContext in sessionStorage); homepage as the final fallback. Auth pages
+  // are never valid destinations — they cause redirect loops.
+  const resolveReturnUrl = (): string => {
+    if (typeof window === 'undefined') return '/';
+    const params = new URLSearchParams(window.location.search);
+    const url = params.get('returnUrl');
+    if (isSafeReturnPath(url) && !isAuthPage(url)) return url;
+    try {
+      const stored = sessionStorage.getItem('returnTo');
+      if (isSafeReturnPath(stored) && !isAuthPage(stored)) return stored;
+    } catch {
+      // sessionStorage unavailable
+    }
+    return '/';
+  };
+
+  // Once the auth state resolves, a logged-in user has no business sitting on
+  // the login page — this covers returning to /login after signing in (back
+  // button, bookmark) and any case where a completed login didn't navigate.
+  // The `loading` gate keeps this effect out of the way of an in-progress
+  // form sign-in, whose own handler decides the destination.
+  // (resolveReturnUrl is intentionally not a dependency: it reads window
+  // state fresh on every call.)
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
+    if (!authLoading && !loading && user) {
+      router.replace(resolveReturnUrl());
     }
-    const error = new URLSearchParams(window.location.search).get('error');
-    if (!error) {
-      return;
-    }
-    setError(OAUTH_ERROR_MESSAGES[error] ?? 'Sign-in could not be completed. Please try again.');
-  }, []);
+  }, [authLoading, loading, user, router]);
 
   // Handle URL parameters safely on mount
   useEffect(() => {
@@ -194,8 +213,8 @@ export default function LoginPage() {
               // Default redirect if no guest resume
               router.push(returnUrl);
             } else {
-              // Default redirect to PYQ page
-              router.push('/pyq');
+              // Back to the page the user came from (or homepage)
+              router.push(resolveReturnUrl());
             }
           } else {
             setError(response.data?.message || 'Failed to authenticate with server');
@@ -305,11 +324,8 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      // Preserve the intended destination across the email sign-in flow too.
-      const returnUrl = new URLSearchParams(window.location.search).get('returnUrl');
-      await login({ email: email.trim().toLowerCase(), password }, {
-        redirectTo: isSafeReturnPath(returnUrl) ? returnUrl : undefined,
-      });
+      // Send the user back to the page they came from (homepage by default).
+      await login({ email: email.trim().toLowerCase(), password }, resolveReturnUrl());
     } catch (err: unknown) {
       const error = err as Error;
       setError(error.message || 'Login failed. Please check your password.');
@@ -351,8 +367,7 @@ export default function LoginPage() {
         localStorage.setItem('user', JSON.stringify(res.user));
         updateUser(res.user);
         preloadAvatar(res.user.picture);
-        const returnUrl = new URLSearchParams(window.location.search).get('returnUrl');
-        router.push(isSafeReturnPath(returnUrl) ? returnUrl : '/pyq');
+        router.push(resolveReturnUrl());
       } else {
         setError(res?.message || 'Failed to create account');
         setLoading(false);

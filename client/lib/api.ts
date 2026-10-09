@@ -11,6 +11,9 @@ import type {
   CreateSessionDTO,
   PYQPaper,
   PYQFilterQuery,
+  PaperRequest,
+  CreatePaperRequestDTO,
+  PaperExistsResponse,
   APIResponse,
   UserResponse,
   PublicUserProfile,
@@ -30,6 +33,7 @@ import type {
   AdminUserListMeta,
   UserStats,
   AdminUserDetail,
+  AdminRole,
   Sponsor,
   CreateSponsorDTO,
 } from '@/types';
@@ -441,8 +445,11 @@ export const adminUserApi = {
     return data;
   },
 
-  updateRole: async (id: string, role: UserRole): Promise<APIResponse> => {
-    const { data } = await apiClient.patch<APIResponse>(`/admin/users/${id}/role`, { role });
+  updateRole: async (id: string, role: UserRole, roleId?: string | null): Promise<APIResponse> => {
+    const { data } = await apiClient.patch<APIResponse>(`/admin/users/${id}/role`, {
+      role,
+      roleId: roleId ?? undefined,
+    });
     return data;
   },
 
@@ -453,6 +460,56 @@ export const adminUserApi = {
 
   remove: async (id: string): Promise<APIResponse> => {
     const { data } = await apiClient.delete<APIResponse>(`/admin/users/${id}`);
+    return data;
+  },
+
+  // Create a new account from the admin console (super-admin only)
+  create: async (payload: {
+    name: string;
+    email: string;
+    password: string;
+    role: UserRole;
+    roleId?: string | null;
+    studentId?: string;
+    phoneNumber?: string;
+    course?: string;
+  }): Promise<APIResponse<{ id: string; email: string; role: UserRole }>> => {
+    const { data } = await apiClient.post<APIResponse<{ id: string; email: string; role: UserRole }>>(
+      '/admin/users',
+      payload
+    );
+    return data;
+  },
+};
+
+// Admin role & permission management API
+export const rolesApi = {
+  list: async (): Promise<APIResponse<AdminRole[]>> => {
+    const { data } = await apiClient.get<APIResponse<AdminRole[]>>('/admin/roles');
+    return data;
+  },
+
+  create: async (payload: {
+    name?: string;
+    label: string;
+    description?: string;
+    color?: string;
+    permissions: string[];
+  }): Promise<APIResponse<AdminRole>> => {
+    const { data } = await apiClient.post<APIResponse<AdminRole>>('/admin/roles', payload);
+    return data;
+  },
+
+  update: async (
+    id: string,
+    payload: { label?: string; description?: string; color?: string; permissions?: string[] }
+  ): Promise<APIResponse<AdminRole>> => {
+    const { data } = await apiClient.patch<APIResponse<AdminRole>>(`/admin/roles/${id}`, payload);
+    return data;
+  },
+
+  remove: async (id: string): Promise<APIResponse> => {
+    const { data } = await apiClient.delete<APIResponse>(`/admin/roles/${id}`);
     return data;
   },
 };
@@ -507,6 +564,41 @@ export const reportApi = {
 
   updateStatus: async (id: string, status: 'resolved' | 'dismissed'): Promise<APIResponse<Report>> => {
     const { data } = await apiClient.patch<APIResponse<Report>>(`/reports/${id}`, { status });
+    return data;
+  },
+};
+
+// Paper request API — students request missing papers, staff triage them
+export const paperRequestApi = {
+  create: async (requestData: CreatePaperRequestDTO): Promise<APIResponse<PaperRequest>> => {
+    const { data } = await apiClient.post<APIResponse<PaperRequest>>('/paper-requests', requestData);
+    return data;
+  },
+
+  // Returns exists:true (and the paper) when an exact paper with this subject
+  // code + year (+ exam type) is already on the platform.
+  check: async (params: {
+    subjectCode: string;
+    year: number;
+    examType?: string;
+    departmentId?: string;
+  }): Promise<PaperExistsResponse> => {
+    const { data } = await apiClient.get<PaperExistsResponse>('/paper-requests/check', { params });
+    return data;
+  },
+
+  list: async (params?: { status?: string; search?: string }): Promise<APIResponse<PaperRequest[]>> => {
+    const { data } = await apiClient.get<APIResponse<PaperRequest[]>>('/paper-requests', { params });
+    return data;
+  },
+
+  updateStatus: async (id: string, status: 'pending' | 'fulfilled' | 'rejected'): Promise<APIResponse<PaperRequest>> => {
+    const { data } = await apiClient.patch<APIResponse<PaperRequest>>(`/paper-requests/${id}/status`, { status });
+    return data;
+  },
+
+  remove: async (id: string): Promise<APIResponse> => {
+    const { data } = await apiClient.delete<APIResponse>(`/paper-requests/${id}`);
     return data;
   },
 };

@@ -1,11 +1,24 @@
 // User types
-export type UserRole = 'student' | 'srt' | 'admin' | 'super-admin';
+// 'staff' = holder of a custom role (see Role / RoleMeta below)
+export type UserRole = 'student' | 'srt' | 'staff' | 'admin' | 'super-admin';
+
+// Display metadata for a custom role, resolved from the server
+export interface RoleMeta {
+  id: string;
+  name: string;
+  label: string;
+  color: string;
+}
 
 export interface User {
   id: string;
   email: string;
   name: string;
   role: UserRole;
+  roleId?: string | null;
+  roleMeta?: RoleMeta | null;
+  /** Permission keys for custom-role ('staff') users; drives admin UI gating */
+  permissions?: string[];
   picture?: string;
   studentId?: string;
   phoneNumber?: string;
@@ -14,6 +27,20 @@ export interface User {
   following?: string[];
   qcoins: number;
   freeDownloadsLeft: number;
+}
+
+// Admin role management types
+export interface AdminRole {
+  id: string;
+  name: string;
+  label: string;
+  description: string;
+  color: string;
+  permissions: string[];
+  isSystem: boolean;
+  memberCount: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // Wallet types
@@ -203,6 +230,42 @@ export interface PYQFilterQuery {
   search?: string;
 }
 
+// Paper requests — students ask for papers they couldn't find
+export interface PaperRequest {
+  _id: string;
+  departmentId: string | Department;
+  branchId: string | Branch;
+  subjectName: string;
+  subjectCode?: string;
+  examType: 'any' | ExamType;
+  year?: number;
+  note?: string;
+  requestedBy: string | Pick<User, 'id' | 'name' | 'email' | 'picture'>;
+  status: 'pending' | 'fulfilled' | 'rejected';
+  reviewedBy?: string | Pick<User, 'id' | 'name' | 'email'>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatePaperRequestDTO {
+  departmentId: string;
+  branchId: string;
+  subjectName: string;
+  subjectCode: string;
+  examType: 'any' | ExamType;
+  year: number;
+  note?: string;
+}
+
+// Result of checking whether an exact paper already exists before requesting.
+export interface PaperExistsResponse extends APIResponse<PYQPaper | null> {
+  exists?: boolean;
+  code?: string;
+  paperId?: string;
+  /** Exam terms already uploaded for this code + year (e.g. ['mid-term']). */
+  existingExamTypes?: ExamType[];
+}
+
 // API Response types
 export interface APIResponse<T = unknown> {
   success: boolean;
@@ -276,6 +339,9 @@ export interface AdminUser {
   email: string;
   picture: string | null;
   role: UserRole;
+  roleId?: string | null;
+  roleLabel?: string | null;
+  roleColor?: string | null;
   isActive: boolean;
   studentId: string;
   course: string;
@@ -297,6 +363,7 @@ export interface UserStats {
   active: number;
   admins: number;
   srt: number;
+  staff: number;
   superAdmins: number;
   banned: number;
 }

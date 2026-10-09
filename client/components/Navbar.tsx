@@ -20,6 +20,7 @@ import {
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { optimizeAvatar } from '@/lib/avatar';
+import { canEnterAdmin } from '@/lib/permissions';
 import {
   ChevronDown,
   LogOut,
@@ -357,7 +358,7 @@ export default function Navbar() {
   ];
 
   const communityLinks: MenuLink[] = [
-    { title: 'Clubs', href: '/coming-soon/societies', description: 'Discover and join campus clubs.', icon: <Users />, badge: 'soon' },
+    { title: 'Clubs', href: '/club', description: 'Discover and join campus clubs.', icon: <Users />, badge: 'soon' },
     { title: 'Events', href: '/events', description: 'Calendar of fests, talks & workshops.', icon: <CalendarDays />, badge: 'new' },
     { title: 'Leaderboard', href: '/leaderboard', description: 'See top contributors & rank up.', icon: <Trophy />, badge: 'new' },
     { title: 'Our Team', href: '/our-team', description: 'Meet the people behind InvertisPrep.', icon: <Users />, badge: 'new' },
@@ -555,7 +556,7 @@ export default function Navbar() {
                     </Link>
                   </DropdownMenuItem>
 
-                  {(user.role === 'admin' || user.role === 'super-admin' || user.role === 'srt') && (
+                  {canEnterAdmin(user) && (
                     <>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem asChild>
@@ -788,7 +789,7 @@ function MobileMenu({
               <UploadCloud className="size-4 text-zinc-400 group-hover:text-zinc-800 transition-colors" /> Upload PYQ
             </Link>
 
-            {user.role === 'admin' || user.role === 'super-admin' || user.role === 'srt' ? (
+{canEnterAdmin(user) ? (
               <Link
                 href="/admin/dashboard"
                 onClick={onNavigate}

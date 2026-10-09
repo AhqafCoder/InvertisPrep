@@ -10,6 +10,7 @@ import {
   Calendar,
   Upload,
   FileText,
+  FileQuestion,
   BookOpen,
   Flag,
   Bug,
@@ -17,6 +18,7 @@ import {
   ShieldCheck,
   Users,
   HandCoins,
+  KeyRound,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -32,10 +34,12 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 import { useAuth } from "@/contexts/AuthContext"
+import { canAccessAdminRoute } from "@/lib/permissions"
 
 export const adminNavItems = [
   { title: "Dashboard", url: "/admin/dashboard", icon: LayoutDashboard },
   { title: "Users", url: "/admin/users", icon: Users },
+  { title: "Roles", url: "/admin/roles", icon: KeyRound },
   { title: "Departments", url: "/admin/departments", icon: Building2 },
   { title: "Branches", url: "/admin/branches", icon: GitBranch },
   { title: "Sessions", url: "/admin/sessions", icon: Calendar },
@@ -43,19 +47,21 @@ export const adminNavItems = [
   { title: "Manage Papers", url: "/admin/papers", icon: FileText },
   { title: "Syllabus", url: "/admin/syllabus", icon: BookOpen },
   { title: "Reports", url: "/admin/reports", icon: Flag },
+  { title: "Paper Requests", url: "/admin/requests", icon: FileQuestion },
   { title: "Bug Reports", url: "/admin/bugs", icon: Bug },
   { title: "Events", url: "/admin/events", icon: CalendarDays }
 ]
-
-// SRT (Support & Resource Team) sees every admin page except User Management
-const srtHiddenItems = ["/admin/users"]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
   const { user, logout } = useAuth()
 
+  // Permission-based filtering: each admin page's required permission lives in
+  // NAV_PERMISSIONS (lib/permissions). Built-ins resolve through their fixed
+  // sets; custom-role users through their granted permissions; super-admin
+  // sees everything.
   const items = adminNavItems
-    .filter((item) => user?.role !== "srt" || !srtHiddenItems.includes(item.url))
+    .filter((item) => canAccessAdminRoute(user, item.url))
     .map((item) => ({
       ...item,
       isActive: pathname === item.url,
