@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { User } from '../models/User.js';
 import { verifyGoogleToken } from '../services/googleAuthService.js';
 import { authService } from '../services/authService.js';
+import { sendWelcomeEmail } from '../services/mailService.js';
 
 // Centralised user shape so every response stays consistent
 const formatUser = (user) => ({
@@ -10,6 +11,7 @@ const formatUser = (user) => ({
   email: user.email,
   name: user.name,
   role: user.role,
+  roleId: user.roleId && typeof user.roleId === 'object' ? user.roleId._id : user.roleId || null,
   picture: user.picture,
   studentId: user.studentId || '',
   phoneNumber: user.phoneNumber || '',
@@ -19,6 +21,30 @@ const formatUser = (user) => ({
   qcoins: user.qcoins ?? 0,
   freeDownloadsLeft: user.freeDownloadsLeft ?? 2,
 });
+
+/**
+ * Same shape, but custom-role ('staff') users also get their permission list
+ * and the role's display metadata so the client can gate the admin UI. Called
+ * on every endpoint that returns a user the client stores in localStorage —
+ * a response missing these fields would wipe the client's permission snapshot.
+ */
+const formatUserWithRole = async (user) => {
+  const formatted = formatUser(user);
+  if (user.role !== 'staff' || !formatted.roleId) return formatted;
+
+  try {
+    const { Role } = await import('../models/Role.js');
+    const role = await Role.findById(formatted.roleId).select('name label color permissions').lean();
+    if (role) {
+      formatted.roleId = String(role._id);
+      formatted.roleMeta = { id: String(role._id), name: role.name, label: role.label, color: role.color };
+      formatted.permissions = role.permissions || [];
+    }
+  } catch (err) {
+    console.error('[Auth] Failed to load custom role:', err.message);
+  }
+  return formatted;
+};
 
 
 // Cookie options for the refresh token.
@@ -79,7 +105,7 @@ export const login = async (req, res) => {
     res.json({
       success: true,
       token: accessToken,
-      user: formatUser(user),
+      user: await formatUserWithRole(user),
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -109,7 +135,7 @@ export const getCurrentUser = async (req, res) => {
 
     res.json({
       success: true,
-      user: formatUser(user),
+      user: await formatUserWithRole(user),
     });
   } catch (error) {
     console.error('Get current user error:', error);
@@ -164,6 +190,11 @@ export const googleLogin = async (req, res) => {
           isActive: true,
           lastLogin: new Date(),
         });
+        // Welcome email for a brand-new signup. Fire-and-forget: a mail failure
+        // must never block or fail the login response.
+        sendWelcomeEmail(user).catch((err) =>
+          console.error('[mail] welcome (google) failed:', err?.message)
+        );
       } else if (!user.isActive) {
         res.status(403).json({ success: false, message: 'Your account has been disabled' });
         return;
@@ -216,7 +247,7 @@ export const googleLogin = async (req, res) => {
     res.json({
       success: true,
       token: accessToken,
-      user: formatUser(user),
+      user: await formatUserWithRole(user),
     });
   } catch (error) {
     console.error('Google login error:', error);
@@ -304,10 +335,133 @@ export const updateProfile = async (req, res) => {
     res.json({
       success: true,
       message: 'Profile updated successfully',
-      user: formatUser(user),
+      user: await formatUserWithRole(user),
     });
   } catch (error) {
     console.error('Update profile error:', error);
     res.status(500).json({ success: false, message: 'Server error during profile update' });
+  }
+};
+
+// ── Email/password student flow ─────────────────────────────────────────────
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Route helper for the login page: does this email have an account, and is it
+ * linked to Google sign-in? Lets the UI decide between the password step, the
+ * registration step, or a "continue with Google" nudge.
+ */
+export const checkEmail = async (req, res) => {
+  try {
+    const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    if (!EMAIL_REGEX.test(email)) {
+      res.status(400).json({ success: false, message: 'Enter a valid email address' });
+      return;
+    }
+
+    const user = await User.findOne({ email }).select('googleId isActive').lean();
+
+    res.json({
+      success: true,
+      data: {
+        exists: !!user,
+        isGoogleLinked: !!user?.googleId,
+        isActive: user ? user.isActive !== false : undefined,
+      },
+    });
+  } catch (error) {
+    console.error('Check email error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+/**
+ * Student registration with email + password. All fields are mandatory:
+ * valid email, name (2-60 chars), password (min 8 chars), 10-digit phone.
+ * Responds with the same shape as login so the client session setup is
+ * identical.
+ */
+export const register = async (req, res) => {
+  try {
+    const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
+    const password = typeof req.body.password === 'string' ? req.body.password : '';
+    const phoneNumber = typeof req.body.phoneNumber === 'string' ? req.body.phoneNumber.trim() : '';
+
+    if (!EMAIL_REGEX.test(email)) {
+      res.status(400).json({ success: false, message: 'Enter a valid email address' });
+      return;
+    }
+    if (name.length < 2 || name.length > 60) {
+      res.status(400).json({ success: false, message: 'Enter your full name' });
+      return;
+    }
+    if (password.length < 8) {
+      res.status(400).json({ success: false, message: 'Password must be at least 8 characters' });
+      return;
+    }
+    if (!/^\d{10}$/.test(phoneNumber)) {
+      res.status(400).json({ success: false, message: 'Enter a valid 10-digit phone number' });
+      return;
+    }
+
+    const existing = await User.findOne({ email }).select('googleId').lean();
+    if (existing) {
+      if (existing.googleId) {
+        res.status(409).json({
+          success: false,
+          message: 'This email is already linked with Google. Please continue with Google.',
+        });
+      } else {
+        res.status(409).json({ success: false, message: 'Account already exists. Please sign in.' });
+      }
+      return;
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    let user;
+    try {
+      user = await User.create({
+        email,
+        name,
+        password: hashedPassword,
+        phoneNumber,
+        role: 'student',
+        isActive: true,
+        lastLogin: new Date(),
+      });
+    } catch (dbError) {
+      if (dbError.code === 11000) {
+        // Race: account created between check and create
+        res.status(409).json({ success: false, message: 'Account already exists. Please sign in.' });
+        return;
+      }
+      throw dbError;
+    }
+
+    // Welcome email for the new email/password signup. Fire-and-forget: a mail
+    // failure must never block or fail registration.
+    sendWelcomeEmail(user).catch((err) =>
+      console.error('[mail] welcome (register) failed:', err?.message)
+    );
+
+    const { accessToken, refreshToken } = await authService.login(user);
+    res.cookie('refreshToken', refreshToken, refreshCookieOptions(7 * 24 * 60 * 60 * 1000));
+    await authService.updateSessionMeta(
+      user._id.toString(),
+      req.headers['user-agent'],
+      req.ip
+    );
+
+    res.status(201).json({
+      success: true,
+      token: accessToken,
+      user: await formatUserWithRole(user),
+    });
+  } catch (error) {
+    console.error('Register error:', error);
+    res.status(500).json({ success: false, message: 'Server error during registration' });
   }
 };

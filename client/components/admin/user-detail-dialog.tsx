@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { adminUserApi } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
+import { BUILTIN_ROLE_META, ROLE_COLORS } from '@/lib/permissions';
 import type { AdminUserDetail } from '@/types';
 import {
   Dialog,
@@ -10,11 +12,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ViewableAvatar } from '@/components/admin/viewable-avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DeleteUserDialog } from '@/components/admin/delete-user-dialog';
 import {
   AlertCircle,
   ArrowDownLeft,
@@ -24,6 +27,7 @@ import {
   FileText,
   Flag,
   ShieldCheck,
+  Trash2,
   UserRound,
 } from 'lucide-react';
 
@@ -31,6 +35,8 @@ interface UserDetailDialogProps {
   userId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Called after a successful deletion so the parent can refresh its list. */
+  onDeleted?: (message: string) => void;
 }
 
 const badgeColorMap: Record<string, string> = {
@@ -59,23 +65,22 @@ const formatDateTime = (value?: string | null) => {
   });
 };
 
-const roleBadge = (role: string) => {
-  switch (role) {
-    case 'super-admin':
-      return <Badge className="bg-slate-900 text-white">Super Admin</Badge>;
-    case 'admin':
-      return <Badge variant="indigo">Admin</Badge>;
-    case 'srt':
-      return <Badge className="bg-teal-600 text-white">SRT</Badge>;
-    default:
-      return <Badge variant="outline">Student</Badge>;
+const roleBadge = (role: string, roleLabel?: string | null, roleColor?: string | null) => {
+  if (role === 'staff') {
+    const style = ROLE_COLORS[roleColor || 'violet'] || ROLE_COLORS.violet;
+    return <Badge className={style.badge}>{roleLabel || 'Custom Role'}</Badge>;
   }
+  const meta = BUILTIN_ROLE_META[role] || BUILTIN_ROLE_META.student;
+  return <Badge className={meta.badge}>{meta.label}</Badge>;
 };
 
-export function UserDetailDialog({ userId, open, onOpenChange }: UserDetailDialogProps) {
+export function UserDetailDialog({ userId, open, onOpenChange, onDeleted }: UserDetailDialogProps) {
+  const { user: currentUser } = useAuth();
+  const isSuperAdmin = currentUser?.role === 'super-admin';
   const [detail, setDetail] = useState<AdminUserDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
     if (!open || !userId) return;
@@ -105,14 +110,6 @@ export function UserDetailDialog({ userId, open, onOpenChange }: UserDetailDialo
       cancelled = true;
     };
   }, [open, userId]);
-
-  const initials = (name: string) =>
-    name
-      .split(' ')
-      .map((p) => p[0])
-      .slice(0, 2)
-      .join('')
-      .toUpperCase();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -155,18 +152,16 @@ export function UserDetailDialog({ userId, open, onOpenChange }: UserDetailDialo
             {/* Profile header */}
             <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-4">
-                <Avatar className="h-14 w-14">
-                  {detail.user.picture && (
-                    <AvatarImage src={detail.user.picture} alt={detail.user.name} />
-                  )}
-                  <AvatarFallback className="bg-indigo-100 text-indigo-700">
-                    {initials(detail.user.name)}
-                  </AvatarFallback>
-                </Avatar>
+                <ViewableAvatar
+                  src={detail.user.picture}
+                  name={detail.user.name}
+                  className="h-14 w-14"
+                  fallbackClassName="bg-indigo-100 text-lg font-bold text-indigo-700"
+                />
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-lg font-black text-slate-900">{detail.user.name}</span>
-                    {roleBadge(detail.user.role)}
+                    {roleBadge(detail.user.role, detail.user.roleLabel, detail.user.roleColor)}
                   </div>
                   <p className="text-sm text-slate-500">{detail.user.email}</p>
                   <p className="text-xs text-slate-400">
@@ -174,15 +169,30 @@ export function UserDetailDialog({ userId, open, onOpenChange }: UserDetailDialo
                   </p>
                 </div>
               </div>
-              <Badge
-                className={
-                  detail.user.isActive
-                    ? 'bg-emerald-100 text-emerald-700'
-                    : 'bg-rose-100 text-rose-700'
-                }
-              >
-                {detail.user.isActive ? 'Active' : 'Banned'}
-              </Badge>
+              <div className="flex flex-col items-start gap-2 sm:items-end">
+                <Badge
+                  className={
+                    detail.user.isActive
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-rose-100 text-rose-700'
+                  }
+                >
+                  {detail.user.isActive ? 'Active' : 'Banned'}
+                </Badge>
+                {isSuperAdmin &&
+                  detail.user.id !== currentUser?.id &&
+                  detail.user.role !== 'super-admin' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 border-rose-200 text-xs font-semibold text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                      onClick={() => setDeleteOpen(true)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete user
+                    </Button>
+                  )}
+              </div>
             </div>
 
             {/* Key stats */}
@@ -389,6 +399,22 @@ export function UserDetailDialog({ userId, open, onOpenChange }: UserDetailDialo
           </div>
         )}
       </DialogContent>
+
+      {/* Nested deletion confirmation — closes the detail view on success */}
+      <DeleteUserDialog
+        user={
+          detail
+            ? { id: detail.user.id, name: detail.user.name, email: detail.user.email }
+            : null
+        }
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        onDeleted={(message) => {
+          setDeleteOpen(false);
+          onOpenChange(false);
+          onDeleted?.(message);
+        }}
+      />
     </Dialog>
   );
 }

@@ -11,6 +11,9 @@ import type {
   CreateSessionDTO,
   PYQPaper,
   PYQFilterQuery,
+  PaperRequest,
+  CreatePaperRequestDTO,
+  PaperExistsResponse,
   APIResponse,
   UserResponse,
   PublicUserProfile,
@@ -30,8 +33,16 @@ import type {
   AdminUserListMeta,
   UserStats,
   AdminUserDetail,
+  AdminRole,
   Sponsor,
   CreateSponsorDTO,
+  MailLogEntry,
+  InboundMailEntry,
+  MailTemplateSection,
+  MailSettings,
+  MailTemplate,
+  UnifiedMailLog,
+  NotifySettings,
 } from '@/types';
 
 // Same-origin proxy paths — next.config.ts rewrites forward these to the
@@ -114,8 +125,16 @@ const forceLogout = () => {
   const isLogin = window.location.pathname.includes('/login');
 
   if (!isViewing && !isLogin) {
+    // Carry the current location so the login page can return here after
+    // re-authentication (in-app relative paths only — never an open redirect).
+    const returnTo = `${window.location.pathname}${window.location.search}`;
+    const isSafeReturn =
+      returnTo.startsWith('/') && !returnTo.startsWith('//') && !returnTo.startsWith('/\\');
+
     if (window.location.pathname.startsWith('/admin')) {
       window.location.href = '/admin/login';
+    } else if (isSafeReturn) {
+      window.location.href = `/login?returnUrl=${encodeURIComponent(returnTo)}`;
     } else {
       window.location.href = '/login';
     }
@@ -433,13 +452,203 @@ export const adminUserApi = {
     return data;
   },
 
-  updateRole: async (id: string, role: UserRole): Promise<APIResponse> => {
-    const { data } = await apiClient.patch<APIResponse>(`/admin/users/${id}/role`, { role });
+  updateRole: async (id: string, role: UserRole, roleId?: string | null): Promise<APIResponse> => {
+    const { data } = await apiClient.patch<APIResponse>(`/admin/users/${id}/role`, {
+      role,
+      roleId: roleId ?? undefined,
+    });
     return data;
   },
 
   updateStatus: async (id: string, isActive: boolean): Promise<APIResponse> => {
     const { data } = await apiClient.patch<APIResponse>(`/admin/users/${id}/status`, { isActive });
+    return data;
+  },
+
+  remove: async (id: string): Promise<APIResponse> => {
+    const { data } = await apiClient.delete<APIResponse>(`/admin/users/${id}`);
+    return data;
+  },
+
+  // Create a new account from the admin console (super-admin only)
+  create: async (payload: {
+    name: string;
+    email: string;
+    password: string;
+    role: UserRole;
+    roleId?: string | null;
+    studentId?: string;
+    phoneNumber?: string;
+    course?: string;
+  }): Promise<APIResponse<{ id: string; email: string; role: UserRole }>> => {
+    const { data } = await apiClient.post<APIResponse<{ id: string; email: string; role: UserRole }>>(
+      '/admin/users',
+      payload
+    );
+    return data;
+  },
+};
+
+// Admin role & permission management API
+export const rolesApi = {
+  list: async (): Promise<APIResponse<AdminRole[]>> => {
+    const { data } = await apiClient.get<APIResponse<AdminRole[]>>('/admin/roles');
+    return data;
+  },
+
+  create: async (payload: {
+    name?: string;
+    label: string;
+    description?: string;
+    color?: string;
+    permissions: string[];
+  }): Promise<APIResponse<AdminRole>> => {
+    const { data } = await apiClient.post<APIResponse<AdminRole>>('/admin/roles', payload);
+    return data;
+  },
+
+  update: async (
+    id: string,
+    payload: { label?: string; description?: string; color?: string; permissions?: string[] }
+  ): Promise<APIResponse<AdminRole>> => {
+    const { data } = await apiClient.patch<APIResponse<AdminRole>>(`/admin/roles/${id}`, payload);
+    return data;
+  },
+
+  remove: async (id: string): Promise<APIResponse> => {
+    const { data } = await apiClient.delete<APIResponse>(`/admin/roles/${id}`);
+    return data;
+  },
+};
+
+// Admin Mail Center API — automail, mailbox, compose, logs, notifications
+export const adminMailApi = {
+  // Automail
+  automail: async (params?: { page?: number; limit?: number; search?: string }) => {
+    const query: Record<string, unknown> = {};
+    if (params?.page) query.page = params.page;
+    if (params?.limit) query.limit = params.limit;
+    if (params?.search) query.search = params.search;
+    const { data } = await apiClient.get<APIResponse<MailLogEntry[]> & { meta?: TransactionMeta }>(
+      '/admin/mail/automail',
+      { params: query }
+    );
+    return data;
+  },
+
+  // Mailbox
+  inbox: async (params?: { page?: number; limit?: number }) => {
+    const query: Record<string, unknown> = {};
+    if (params?.page) query.page = params.page;
+    if (params?.limit) query.limit = params.limit;
+    const { data } = await apiClient.get<APIResponse<InboundMailEntry[]> & { meta?: TransactionMeta; imapConfigured?: boolean }>(
+      '/admin/mail/mailbox',
+      { params: query }
+    );
+    return data;
+  },
+  sync: async () => {
+    const { data } = await apiClient.post<APIResponse & { synced?: number; total?: number }>(
+      '/admin/mail/mailbox/sync'
+    );
+    return data;
+  },
+  getInbound: async (id: string) => {
+    const { data } = await apiClient.get<APIResponse<InboundMailEntry & { html?: string; text?: string }>>(
+      `/admin/mail/mailbox/${id}`
+    );
+    return data;
+  },
+  // Full detail for a SENT mail (from the logs) — includes the rendered body.
+  getSent: async (id: string) => {
+    const { data } = await apiClient.get<
+      APIResponse<{
+        id: string;
+        to: string;
+        from: string;
+        subject: string;
+        kind: string;
+        status: string;
+        error?: string;
+        preview?: string;
+        html?: string;
+        createdAt: string;
+        user?: { id: string; name?: string; email?: string; picture?: string | null } | null;
+      }>
+    >(`/admin/mail/logs/${id}`);
+    return data;
+  },
+
+  // Compose
+  recipients: async (): Promise<APIResponse<{ recipientCount: number }>> => {
+    const { data } = await apiClient.get<APIResponse<{ recipientCount: number }>>(
+      '/admin/mail/compose/recipients'
+    );
+    return data;
+  },
+  sendCampaign: async (payload: {
+    subject: string;
+    bannerUrl?: string;
+    heading?: string;
+    intro?: string;
+    sections?: MailTemplateSection[];
+    footer?: string;
+    rawHtml?: string;
+  }): Promise<APIResponse<{ recipientCount: number }>> => {
+    const { data } = await apiClient.post<APIResponse<{ recipientCount: number }>>(
+      '/admin/mail/compose/send',
+      payload
+    );
+    return data;
+  },
+  uploadBanner: async (file: File): Promise<APIResponse<{ url: string }>> => {
+    const formData = new FormData();
+    formData.append('image', file);
+    const { data } = await apiClient.post<APIResponse<{ url: string }>>(
+      '/admin/mail/compose/upload-banner',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return data;
+  },
+
+  // Settings (welcome toggle + templates)
+  settings: async (): Promise<APIResponse<MailSettings>> => {
+    const { data } = await apiClient.get<APIResponse<MailSettings>>('/admin/mail/settings');
+    return data;
+  },
+  updateSettings: async (payload: {
+    welcomeEmailEnabled?: boolean;
+    welcomeTemplate?: MailTemplate;
+  }): Promise<APIResponse<{ welcomeEmailEnabled: boolean }>> => {
+    const { data } = await apiClient.put<APIResponse<{ welcomeEmailEnabled: boolean }>>(
+      '/admin/mail/settings',
+      payload
+    );
+    return data;
+  },
+
+  // Logs
+  logs: async (params?: { page?: number; limit?: number; search?: string; direction?: 'sent' | 'received' | 'all' }) => {
+    const query: Record<string, unknown> = {};
+    if (params?.page) query.page = params.page;
+    if (params?.limit) query.limit = params.limit;
+    if (params?.search) query.search = params.search;
+    if (params?.direction && params.direction !== 'all') query.direction = params.direction;
+    const { data } = await apiClient.get<APIResponse<UnifiedMailLog[]> & { meta?: TransactionMeta }>(
+      '/admin/mail/logs',
+      { params: query }
+    );
+    return data;
+  },
+
+  // Notifications (paper-request ack + fulfillment toggles)
+  notifications: async (): Promise<APIResponse<NotifySettings>> => {
+    const { data } = await apiClient.get<APIResponse<NotifySettings>>('/admin/mail/notifications');
+    return data;
+  },
+  updateNotifications: async (payload: Partial<NotifySettings>): Promise<APIResponse<NotifySettings>> => {
+    const { data } = await apiClient.put<APIResponse<NotifySettings>>('/admin/mail/notifications', payload);
     return data;
   },
 };
@@ -494,6 +703,41 @@ export const reportApi = {
 
   updateStatus: async (id: string, status: 'resolved' | 'dismissed'): Promise<APIResponse<Report>> => {
     const { data } = await apiClient.patch<APIResponse<Report>>(`/reports/${id}`, { status });
+    return data;
+  },
+};
+
+// Paper request API — students request missing papers, staff triage them
+export const paperRequestApi = {
+  create: async (requestData: CreatePaperRequestDTO): Promise<APIResponse<PaperRequest>> => {
+    const { data } = await apiClient.post<APIResponse<PaperRequest>>('/paper-requests', requestData);
+    return data;
+  },
+
+  // Returns exists:true (and the paper) when an exact paper with this subject
+  // code + year (+ exam type) is already on the platform.
+  check: async (params: {
+    subjectCode: string;
+    year: number;
+    examType?: string;
+    departmentId?: string;
+  }): Promise<PaperExistsResponse> => {
+    const { data } = await apiClient.get<PaperExistsResponse>('/paper-requests/check', { params });
+    return data;
+  },
+
+  list: async (params?: { status?: string; search?: string }): Promise<APIResponse<PaperRequest[]>> => {
+    const { data } = await apiClient.get<APIResponse<PaperRequest[]>>('/paper-requests', { params });
+    return data;
+  },
+
+  updateStatus: async (id: string, status: 'pending' | 'fulfilled' | 'rejected'): Promise<APIResponse<PaperRequest>> => {
+    const { data } = await apiClient.patch<APIResponse<PaperRequest>>(`/paper-requests/${id}/status`, { status });
+    return data;
+  },
+
+  remove: async (id: string): Promise<APIResponse> => {
+    const { data } = await apiClient.delete<APIResponse>(`/paper-requests/${id}`);
     return data;
   },
 };

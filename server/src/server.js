@@ -29,7 +29,10 @@ import bugRoutes from './routes/bugs.js';
 import leaderboardRoutes from './routes/leaderboard.js';
 import eventRoutes from './routes/events.js';
 import adminUserRoutes from './routes/adminUsers.js';
+import roleRoutes from './routes/roles.js';
 import sponsorRoutes from './routes/sponsors.js';
+import paperRequestRoutes from './routes/paperRequests.js';
+import adminMailRoutes from './routes/adminMail.js';
 
 // Initialize Express app
 const app = express();
@@ -122,6 +125,7 @@ app.use('/api/sessions', sessionRoutes);
 app.use('/api/syllabus', syllabusRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/paper-requests', paperRequestRoutes);
 app.use('/api/pdf', pdfLimiter, pdfRoutes);
 app.use('/api/pdf-proxy', pdfProxyRoutes);
 app.use('/api/resumes', resumeRoutes);
@@ -130,6 +134,8 @@ app.use('/api/bugs', bugRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/admin/users', adminUserRoutes);
+app.use('/api/admin/roles', roleRoutes);
+app.use('/api/admin/mail', adminMailRoutes);
 app.use('/api/sponsors', sponsorRoutes);
 
   // Apply write limiter to mutation-heavy routes
@@ -142,6 +148,7 @@ app.use('/api/sponsors', sponsorRoutes);
   app.use('/api/wallet', writeLimiter);
   app.use('/api/bugs', writeLimiter);
   app.use('/api/admin/users', writeLimiter);
+  app.use('/api/admin/roles', writeLimiter);
   app.use('/api/sponsors', writeLimiter);
 
   // Error handling

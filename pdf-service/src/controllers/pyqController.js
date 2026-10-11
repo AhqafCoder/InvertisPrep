@@ -9,6 +9,28 @@ const awardPoints = async (userId, points, type, description) => {
   console.log(`[Points] Should award ${points} points to ${userId} for ${type}: ${description}`);
 };
 
+// Sanitize the multi-branch tags sent by the upload form (JSON string from
+// FormData, a comma-separated list, or an array) — strings only, deduped,
+// primary branch excluded, capped at 20.
+const parseAdditionalBranchIds = (raw, primaryBranchId) => {
+  let list = raw;
+  if (typeof raw === 'string') {
+    try {
+      list = JSON.parse(raw);
+    } catch {
+      list = raw.split(',').map((s) => s.trim());
+    }
+  }
+  if (!Array.isArray(list)) return [];
+  return [
+    ...new Set(
+      list
+        .filter((id) => typeof id === 'string' && id.trim() && id !== primaryBranchId)
+        .map((id) => id.trim()),
+    ),
+  ].slice(0, 20);
+};
+
 // Upload PYQ (admin only)
 export const uploadPYQ = async (req, res) => {
   try {
@@ -19,6 +41,7 @@ export const uploadPYQ = async (req, res) => {
     const {
       departmentId,
       branchId,
+      additionalBranchIds,
       sessionId,
       semester,
       subjectName,
@@ -48,6 +71,7 @@ export const uploadPYQ = async (req, res) => {
       subjectCode: subjectCode || undefined,
       departmentId,
       branchId,
+      additionalBranchIds: parseAdditionalBranchIds(additionalBranchIds, branchId),
       sessionId,
       semester: parseInt(semester.toString()),
       examType,
@@ -87,24 +111,43 @@ export const getPYQs = async (req, res) => {
       return string.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
     };
 
+    // Separator-tolerant pattern: matches the query's alphanumerics in order
+    // allowing any punctuation/spaces between them, so "BAS301", "BAS 301"
+    // and "BAS-301" all match each other (and "b.tech" ↔ "btech").
+    const loosePattern = (string) => {
+      if (typeof string !== 'string') return '';
+      const chars = string.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (!chars) return '';
+      return chars.split('').map(escapeRegex).join('[^a-z0-9]*');
+    };
+
     // Build dynamic filter
     const filter = { verified: true, isActive: true };
     if (departmentId) filter.departmentId = departmentId;
-    if (branchId) filter.branchId = branchId;
+    if (branchId) {
+      // A paper is visible under a branch when it is its primary branch or
+      // one of its additional branches (multi-branch uploads). Wrapped in
+      // $and so it never collides with the $or the search filter sets below.
+      filter.$and = [
+        ...(filter.$and || []),
+        { $or: [{ branchId }, { additionalBranchIds: branchId }] },
+      ];
+    }
     if (sessionId) filter.sessionId = sessionId;
     if (semester) filter.semester = parseInt(semester);
     if (examType) filter.examType = examType;
-    
+
     if (subjectCode) {
-      filter.subjectCode = new RegExp(escapeRegex(subjectCode), 'i');
+      const pattern = loosePattern(subjectCode);
+      if (pattern) filter.subjectCode = new RegExp(pattern, 'i');
     }
 
     if (search) {
-      const escapedSearch = escapeRegex(search);
-      filter.$or = [
-        { subjectName: new RegExp(escapedSearch, 'i') },
-        { subjectCode: new RegExp(escapedSearch, 'i') }
-      ];
+      const pattern = loosePattern(search);
+      if (pattern) {
+        const regex = new RegExp(pattern, 'i');
+        filter.$or = [{ subjectName: regex }, { subjectCode: regex }];
+      }
     }
 
     const pyqs = await PDFDocument.find(filter, { cloudinaryUrl: 0, cloudinaryPublicId: 0 })
@@ -141,6 +184,7 @@ export const getAllPYQs = async (req, res) => {
       PDFDocument.find(filter)
         .populate('departmentId', 'name displayName')
         .populate('branchId', 'name')
+        .populate('additionalBranchIds', 'name')
         .populate('sessionId', 'name')
         .populate('uploadedBy', 'name email picture')
         .sort({ createdAt: -1 })
@@ -248,7 +292,7 @@ export const deletePYQ = async (req, res) => {
 export const updatePYQ = async (req, res) => {
   try {
     const { id } = req.params;
-    const { subjectName, subjectCode, year, examType, semester } = req.body;
+    const { subjectName, subjectCode, year, examType, semester, additionalBranchIds } = req.body;
 
     const pyq = await PDFDocument.findById(id);
     if (!pyq) {
@@ -260,6 +304,9 @@ export const updatePYQ = async (req, res) => {
     if (year) pyq.year = parseInt(year);
     if (examType) pyq.examType = examType;
     if (semester) pyq.semester = parseInt(semester);
+    if (additionalBranchIds !== undefined) {
+      pyq.additionalBranchIds = parseAdditionalBranchIds(additionalBranchIds, pyq.branchId);
+    }
 
     pyq.title = `${pyq.subjectName} ${pyq.examType} ${pyq.year}`;
     await pyq.save();
@@ -289,6 +336,7 @@ export const uploadPYQPublic = async (req, res) => {
     const {
       departmentId,
       branchId,
+      additionalBranchIds,
       sessionId,
       semester,
       subjectName,
@@ -315,6 +363,7 @@ export const uploadPYQPublic = async (req, res) => {
       subjectCode: subjectCode || undefined,
       departmentId,
       branchId,
+      additionalBranchIds: parseAdditionalBranchIds(additionalBranchIds, branchId),
       sessionId,
       semester: parseInt(semester.toString()),
       examType,
@@ -342,7 +391,9 @@ export const uploadPYQPublic = async (req, res) => {
 export const getDailyUploadCount = async (req, res) => {
   try {
     const dailyLimit = 10;
-    if (['admin', 'super-admin', 'srt'].includes(req.user.role)) {
+    // Staff accounts (including custom roles) upload for the platform, not for
+    // themselves, so the per-user daily limit doesn't apply to them.
+    if (['admin', 'super-admin', 'srt', 'staff'].includes(req.user.role)) {
       return res.json({ success: true, data: { count: 0, limit: dailyLimit, isExempt: true } });
     }
 

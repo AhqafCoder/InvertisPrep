@@ -1,8 +1,9 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { authApi, resumeApi } from '@/lib/api';
+import { isSafeReturnPath, isAuthPage } from '@/lib/canonical';
 import { optimizeAvatar } from '@/lib/avatar';
 import type { User, LoginCredentials } from '@/types';
 
@@ -36,7 +37,7 @@ function preloadAvatar(url?: string) {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (credentials: LoginCredentials) => Promise<void>;
+  login: (credentials: LoginCredentials, redirectTo?: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (updatedUser: User) => void;
   migrateGuestResume: () => Promise<string | null>;
@@ -50,6 +51,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const pathname = usePathname();
+
+  // Remember the last page a logged-out visitor was on, so the login page can
+  // send them back there after signing in. Auth pages are never recorded — a
+  // logged-in user sent back to a login page causes redirect loops.
+  useEffect(() => {
+    if (!loading && !user && pathname && !isAuthPage(pathname)) {
+      try {
+        sessionStorage.setItem('returnTo', pathname);
+      } catch {
+        // sessionStorage unavailable — redirect just falls back to homepage
+      }
+    }
+  }, [loading, user, pathname]);
 
   // Load user from localStorage on mount
   useEffect(() => {
@@ -62,15 +77,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const parsed = JSON.parse(storedUser);
           setUser(parsed);
           preloadAvatar(parsed.picture);
-          // Optionally verify token with backend
+          // Revalidate against the backend. A failure here must NOT sign the
+          // user out unless the backend actually rejected the token — a 404,
+          // 429 rate-limit, 5xx or network blip must leave the session intact
+          // (the axios interceptor already handles any 401 via the refresh
+          // flow). Only 401/403 after the interceptor gives up clears state.
           const response = await authApi.getCurrentUser();
           if (response.success && response.user) {
             setUser(response.user);
             localStorage.setItem('user', JSON.stringify(response.user));
           }
         } catch (error) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
+          const status = (error as { response?: { status?: number } })?.response?.status;
+          if (status === 401 || status === 403) {
+            // Token genuinely rejected (and refresh failed) → clear session.
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+          }
+          // Any other error: keep the stored session and continue optimistically.
         }
       }
       setLoading(false);
@@ -79,20 +103,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadUser();
   }, []);
 
-  const login = async (credentials: LoginCredentials) => {
+  const login = async (credentials: LoginCredentials, redirectTo?: string) => {
     try {
       const response = await authApi.login(credentials);
-      
+
       if (response.success && response.token && response.user) {
         localStorage.setItem('token', response.token);
         localStorage.setItem('user', JSON.stringify(response.user));
         setUser(response.user);
-        
-        // Redirect based on role
-        if (response.user.role === 'admin' || response.user.role === 'super-admin') {
+
+        // Redirect based on role — staff accounts (admins, super admins, SRT
+        // and custom-role holders) go to the admin console
+        if (
+          response.user.role === 'admin' ||
+          response.user.role === 'super-admin' ||
+          response.user.role === 'srt' ||
+          response.user.role === 'staff'
+        ) {
           router.push('/admin/dashboard');
         } else {
-          router.push('/');
+          router.push(redirectTo || '/');
         }
       }
     } catch (error: unknown) {

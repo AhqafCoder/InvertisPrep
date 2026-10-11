@@ -20,7 +20,7 @@ import {
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { optimizeAvatar } from '@/lib/avatar';
-import SponsorPopover from '@/components/SponsorPopover';
+import { canEnterAdmin } from '@/lib/permissions';
 import {
   ChevronDown,
   LogOut,
@@ -51,8 +51,9 @@ import {
   HandCoins,
   Heart,
 } from 'lucide-react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { buildLoginHref } from '@/lib/canonical';
 
 // ============================================================
 // Social links — update these two URLs to your real profiles
@@ -260,12 +261,24 @@ function NavDropdown({
 // ============================================================
 export default function Navbar() {
   const { user, logout } = useAuth();
+  const router = useRouter();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [isHiddenByFooter, setIsHiddenByFooter] = useState(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const navRef = useRef<HTMLElement>(null);
+
+  // Carry the current location into the login page so the user can be
+  // returned here (on the canonical domain) after authentication.
+  const handleSignInClick = (e: React.MouseEvent) => {
+    const destination = buildLoginHref(window.location.pathname, window.location.search);
+    if (destination === '/login') {
+      return;
+    }
+    e.preventDefault();
+    router.push(destination);
+  };
 
   // Hide navbar on the protected PDF viewer pages
   const hideNavbar = pathname && pathname.startsWith('/view/');
@@ -339,7 +352,7 @@ export default function Navbar() {
   ];
 
   const careerLinks: MenuLink[] = [
-    { title: 'ATS Score Checker', href: '/coming-soon/ats-score', description: 'Check how your resume scores against ATS filters.', icon: <Target />, badge: 'soon' },
+    { title: 'ATS Score Checker', href: '/ats-score', description: 'Check how your resume scores against ATS filters.', icon: <Target />, badge: 'new' },
     { title: 'Resume Builder', href: user ? '/resumes' : '/resume-builder', description: 'Create, manage and export ATS-friendly resumes.', icon: <FileCheck2 />, badge: 'new' },
     { title: 'Career Hub', href: '/coming-soon/career', description: 'Internships, jobs & hackathons for students.', icon: <Briefcase />, badge: 'soon' },
   ];
@@ -352,7 +365,6 @@ export default function Navbar() {
   ];
 
   const supportLinks: MenuLink[] = [
-    { title: 'Sponsor Us', href: '/sponsor', description: 'Support InvertisPrep — see our sponsors.', icon: <HandCoins />, badge: 'new' },
     { title: 'Contact', href: '/contact', description: 'Reach out to the InvertisPrep team.', icon: <Mail /> },
     { title: 'Report a Bug', href: '/report-bug', description: 'Found something broken? Tell us.', icon: <Bug /> },
     { title: 'Support', href: '/support', description: 'Help center & FAQs.', icon: <LifeBuoy /> },
@@ -422,9 +434,6 @@ export default function Navbar() {
               <Instagram className="h-4 w-4" />
             </SocialIconLink>
           </div>
-
-          {/* Sponsor — always visible (desktop + mobile), opens a popup card */}
-          <SponsorPopover />
 
           {/* Mobile menu trigger */}
           <div className="lg:hidden">
@@ -547,7 +556,7 @@ export default function Navbar() {
                     </Link>
                   </DropdownMenuItem>
 
-                  {(user.role === 'admin' || user.role === 'super-admin' || user.role === 'srt') && (
+                  {canEnterAdmin(user) && (
                     <>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem asChild>
@@ -567,22 +576,13 @@ export default function Navbar() {
                       </DropdownMenuItem>
                     </>
                   )}
-
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild className="cursor-pointer">
-                    <Link href="/sponsor">
-                      <Heart className="mr-2 h-4 w-4 text-rose-500" /> Sponsor
-                    </Link>
-                  </DropdownMenuItem>
-
-                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600 focus:text-red-600">
                     <LogOut className="mr-2 h-4 w-4" /> Log out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Link href="/login">
+              <Link href="/login" onClick={handleSignInClick}>
                 <Button className="bg-zinc-900 text-white shadow-sm hover:bg-zinc-800 rounded-md font-medium px-5">
                   Sign In
                 </Button>
@@ -666,6 +666,18 @@ function MobileMenu({
   onNavigate,
   onLogout,
 }: MobileMenuProps) {
+  const router = useRouter();
+
+  // Same deep-link preservation as the desktop navbar Sign In button.
+  const handleSignInClick = (e: React.MouseEvent) => {
+    const destination = buildLoginHref(window.location.pathname, window.location.search);
+    if (destination === '/login') {
+      return;
+    }
+    e.preventDefault();
+    router.push(destination);
+  };
+
   const groups: { value: string; label: string; links: MenuLink[] }[] = [
     { value: 'academics', label: 'Academics', links: academicLinks },
     { value: 'career', label: 'Career', links: careerLinks },
@@ -714,7 +726,13 @@ function MobileMenu({
 
       {!user && (
         <div className="p-4 pb-1">
-          <Link href="/login" onClick={onNavigate}>
+          <Link
+            href="/login"
+            onClick={(e) => {
+              handleSignInClick(e);
+              onNavigate();
+            }}
+          >
             <Button className="w-full bg-zinc-900 text-white hover:bg-zinc-800 rounded-md">
               Sign In
             </Button>
@@ -770,15 +788,8 @@ function MobileMenu({
             >
               <UploadCloud className="size-4 text-zinc-400 group-hover:text-zinc-800 transition-colors" /> Upload PYQ
             </Link>
-            <Link
-              href="/sponsor"
-              onClick={onNavigate}
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-zinc-100 hover:text-zinc-900 group"
-            >
-              <Heart className="size-4 text-rose-500 transition-colors group-hover:text-rose-600" />
-              Sponsor
-            </Link>
-            {user.role === 'admin' || user.role === 'super-admin' || user.role === 'srt' ? (
+
+{canEnterAdmin(user) ? (
               <Link
                 href="/admin/dashboard"
                 onClick={onNavigate}

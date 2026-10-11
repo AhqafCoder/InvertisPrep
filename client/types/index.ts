@@ -1,11 +1,24 @@
 // User types
-export type UserRole = 'student' | 'srt' | 'admin' | 'super-admin';
+// 'staff' = holder of a custom role (see Role / RoleMeta below)
+export type UserRole = 'student' | 'srt' | 'staff' | 'admin' | 'super-admin';
+
+// Display metadata for a custom role, resolved from the server
+export interface RoleMeta {
+  id: string;
+  name: string;
+  label: string;
+  color: string;
+}
 
 export interface User {
   id: string;
   email: string;
   name: string;
   role: UserRole;
+  roleId?: string | null;
+  roleMeta?: RoleMeta | null;
+  /** Permission keys for custom-role ('staff') users; drives admin UI gating */
+  permissions?: string[];
   picture?: string;
   studentId?: string;
   phoneNumber?: string;
@@ -14,6 +27,20 @@ export interface User {
   following?: string[];
   qcoins: number;
   freeDownloadsLeft: number;
+}
+
+// Admin role management types
+export interface AdminRole {
+  id: string;
+  name: string;
+  label: string;
+  description: string;
+  color: string;
+  permissions: string[];
+  isSystem: boolean;
+  memberCount: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // Wallet types
@@ -158,6 +185,9 @@ export interface PYQPaper {
   subjectCode?: string;
   departmentId: string | Department;
   branchId: string | Branch;
+  // Extra branches the paper also applies to (multi-branch uploads). Raw ids
+  // from the public API; the admin listing populates them as Branch docs.
+  additionalBranchIds?: Array<string | Branch>;
   sessionId: string | Session;
   semester: number;
   examType: ExamType;
@@ -180,6 +210,7 @@ export interface PYQPaper {
 export interface UploadPYQDTO {
   departmentId: string;
   branchId: string;
+  additionalBranchIds?: string[];
   sessionId: string;
   semester: number;
   subjectName: string;
@@ -199,6 +230,42 @@ export interface PYQFilterQuery {
   search?: string;
 }
 
+// Paper requests — students ask for papers they couldn't find
+export interface PaperRequest {
+  _id: string;
+  departmentId: string | Department;
+  branchId: string | Branch;
+  subjectName: string;
+  subjectCode?: string;
+  examType: 'any' | ExamType;
+  year?: number;
+  note?: string;
+  requestedBy: string | Pick<User, 'id' | 'name' | 'email' | 'picture'>;
+  status: 'pending' | 'fulfilled' | 'rejected';
+  reviewedBy?: string | Pick<User, 'id' | 'name' | 'email'>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatePaperRequestDTO {
+  departmentId: string;
+  branchId: string;
+  subjectName: string;
+  subjectCode: string;
+  examType: 'any' | ExamType;
+  year: number;
+  note?: string;
+}
+
+// Result of checking whether an exact paper already exists before requesting.
+export interface PaperExistsResponse extends APIResponse<PYQPaper | null> {
+  exists?: boolean;
+  code?: string;
+  paperId?: string;
+  /** Exam terms already uploaded for this code + year (e.g. ['mid-term']). */
+  existingExamTypes?: ExamType[];
+}
+
 // API Response types
 export interface APIResponse<T = unknown> {
   success: boolean;
@@ -206,6 +273,81 @@ export interface APIResponse<T = unknown> {
   data?: T;
   count?: number;
   error?: string;
+}
+
+// ── Admin Mail Center types ─────────────────────────────────────────────────
+export interface MailLogEntry {
+  id: string;
+  to: string;
+  from: string;
+  subject: string;
+  kind: 'welcome' | 'campaign' | 'administrative' | 'other';
+  status: 'sent' | 'failed';
+  error?: string;
+  preview?: string;
+  user?: { id: string; name?: string; email?: string; picture?: string | null } | null;
+  createdAt: string;
+}
+
+export interface InboundMailEntry {
+  id: string;
+  uid: number;
+  from: string;
+  to: string;
+  subject: string;
+  preview: string;
+  mailType: 'plain' | 'bounce';
+  receivedAt: string;
+}
+
+export interface UnifiedMailLog {
+  id: string;
+  ts: string;
+  direction: 'sent' | 'received';
+  from?: string;
+  to?: string;
+  subject: string;
+  kind: string;
+  status: 'sent' | 'failed' | 'synced' | 'bounced';
+  error?: string;
+  preview?: string;
+}
+
+export interface MailSettings {
+  welcomeEmailEnabled: boolean;
+  welcomeTemplate: MailTemplate | null;
+  mailSetupDone: boolean;
+  imapConfigured: boolean;
+}
+
+export interface MailTemplateSection {
+  type: 'heading' | 'paragraph' | 'image' | 'button' | 'divider';
+  text?: string;
+  url?: string;
+  imageUrl?: string;
+  align?: 'left' | 'center' | 'right';
+  fontSize?: number;
+  color?: string;
+  /** Button background color (buttons only) */
+  bgColor?: string;
+}
+
+export interface MailTemplate {
+  bannerUrl: string;
+  heading: string;
+  intro: string;
+  sections: MailTemplateSection[];
+  footer: string;
+  email: string;
+  /** When set, this raw HTML is sent verbatim (with {{placeholders}} substituted). */
+  rawHtml?: string;
+}
+
+export interface NotifySettings {
+  requestAck: boolean;
+  requestFulfilled: boolean;
+  requestAckTemplate?: MailTemplate;
+  requestFulfilledTemplate?: MailTemplate;
 }
 
 // Report types
@@ -272,6 +414,9 @@ export interface AdminUser {
   email: string;
   picture: string | null;
   role: UserRole;
+  roleId?: string | null;
+  roleLabel?: string | null;
+  roleColor?: string | null;
   isActive: boolean;
   studentId: string;
   course: string;
@@ -293,6 +438,7 @@ export interface UserStats {
   active: number;
   admins: number;
   srt: number;
+  staff: number;
   superAdmins: number;
   banned: number;
 }

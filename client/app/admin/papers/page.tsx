@@ -4,11 +4,12 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
+import { hasPermission } from '@/lib/permissions';
+import { matchesQuery } from '@/lib/search';
 import { pyqApi, pdfApi } from '@/lib/api';
-import type { PYQPaper, User, ExamType } from '@/types';
+import type { PYQPaper, User } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Select,
   SelectContent,
@@ -16,19 +17,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { EditPaperDialog } from '@/components/admin/edit-paper-dialog';
+import { toast } from 'sonner';
 import Link from 'next/link';
 
 export default function PapersPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
-  // SRT can view/verify/upload but cannot edit or delete papers
-  const canModify = user?.role !== 'srt';
+  // Verify is separate from edit/delete: a custom role may hold one and not the other.
+  const canModify = hasPermission(user, 'papers.delete');
+  const canVerify = hasPermission(user, 'papers.verify');
   const [papers, setPapers] = useState<PYQPaper[]>([]);
   const [filteredPapers, setFilteredPapers] = useState<PYQPaper[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -37,18 +39,14 @@ export default function PapersPage() {
     searchParams.get('verified') === 'unverified' ? 'unverified' : 'all'
   );
   const [selected, setSelected] = useState<string[]>([]);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editFormData, setEditFormData] = useState({
-    subjectName: '',
-    subjectCode: '',
-    year: '',
-    examType: '',
-    semester: '',
-  });
+  const [editPaper, setEditPaper] = useState<PYQPaper | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
 
-  const fetchPapers = async (opts?: { page?: number; limit?: number }) => {
+  // `silent` keeps the current list mounted while refetching, so the page
+  // height doesn't collapse and the user's scroll position survives an edit.
+  const fetchPapers = async (opts?: { page?: number; limit?: number; silent?: boolean }) => {
     try {
-      setLoading(true);
+      if (!opts?.silent) setLoading(true);
       const params: Record<string, unknown> = {
         page: opts?.page ?? page,
         limit: opts?.limit ?? pageSize,
@@ -61,9 +59,9 @@ export default function PapersPage() {
       setFilteredPapers(res.data || []);
       setTotal(typeof (res as any).total === 'number' ? (res as any).total : (res.count ?? (res.data?.length || 0)));
     } catch (err: unknown) {
-      setError('Failed to load papers');
+      toast.error('Failed to load papers');
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   };
 
@@ -80,57 +78,38 @@ export default function PapersPage() {
       if (!searchTerm.trim()) {
         return true;
       }
-      const term = searchTerm.toLowerCase();
-      // Search in subject name and code
-      if (
-        paper.subjectName.toLowerCase().includes(term) ||
-        (paper.subjectCode && paper.subjectCode.toLowerCase().includes(term))
-      ) {
-        return true;
-      }
 
-      // Search in department
+      // Separator/punctuation-insensitive across every field, so codes like
+      // "BAS301" / "BAS 301" and names like "b.tech" / "btech" all match.
+      const fields: string[] = [
+        paper.subjectName,
+        paper.subjectCode || '',
+        paper.examType,
+        String(paper.year ?? ''),
+        String(paper.semester ?? ''),
+      ];
       if (typeof paper.departmentId !== 'string') {
-        if (
-          paper.departmentId.name.toLowerCase().includes(term) ||
-          paper.departmentId.displayName?.toLowerCase().includes(term)
-        ) {
-          return true;
-        }
+        fields.push(paper.departmentId.name, paper.departmentId.displayName || '');
       }
-
-      // Search in branch
       if (typeof paper.branchId !== 'string') {
-        if (paper.branchId.name.toLowerCase().includes(term)) {
-          return true;
-        }
+        fields.push(paper.branchId.name);
       }
-
-      // Search in session
       if (typeof paper.sessionId !== 'string') {
-        if (paper.sessionId.name.toLowerCase().includes(term)) {
-          return true;
-        }
+        fields.push(paper.sessionId.name);
       }
 
-      // Search in exam type and year
-      if (paper.examType.toLowerCase().includes(term) || paper.year.toString().includes(term)) {
-        return true;
-      }
-
-      // Search in semester
-      if (paper.semester.toString().includes(term)) {
-        return true;
-      }
-
-      return false;
+      return fields.some((field) => matchesQuery(field, searchTerm));
     });
   };
 
+  // A new search/filter starts back at page 1...
   useEffect(() => {
-    const filtered = filterPapers(query, verificationFilter, papers);
-    setFilteredPapers(filtered);
     setPage(1);
+  }, [query, verificationFilter]);
+
+  // ...but a refetch must not reset the page the user is browsing.
+  useEffect(() => {
+    setFilteredPapers(filterPapers(query, verificationFilter, papers));
   }, [query, verificationFilter, papers]);
 
   useEffect(() => {
@@ -145,8 +124,8 @@ export default function PapersPage() {
   const handleVerify = async (id: string) => {
     try {
       await pyqApi.verify(id);
-      setSuccess('Paper verified successfully');
-      fetchPapers();
+      toast.success('Paper verified successfully');
+      fetchPapers({ silent: true });
     } catch (err: unknown) {
       let errorMessage = 'Failed to verify paper';
       const axiosError = err as any;
@@ -155,7 +134,7 @@ export default function PapersPage() {
       } else if (err instanceof Error) {
         errorMessage = err.message;
       }
-      setError(errorMessage);
+      toast.error(errorMessage);
     }
   };
 
@@ -164,70 +143,18 @@ export default function PapersPage() {
 
     try {
       await pyqApi.delete(id);
-      setSuccess('Paper deleted successfully');
+      toast.success('Paper deleted successfully');
       // deselect if selected
       setSelected((s) => s.filter((sid) => sid !== id));
-      fetchPapers();
+      fetchPapers({ silent: true });
     } catch (err: unknown) {
-      setError('Failed to delete paper');
+      toast.error('Failed to delete paper');
     }
   };
 
   const handleEdit = (paper: PYQPaper) => {
-    setEditFormData({
-      subjectName: paper.subjectName,
-      subjectCode: paper.subjectCode || '',
-      year: paper.year.toString(),
-      examType: paper.examType,
-      semester: paper.semester.toString(),
-    });
-    setEditingId(paper._id);
-  };
-
-  const handleCancelEdit = () => {
-    setEditingId(null);
-    setEditFormData({
-      subjectName: '',
-      subjectCode: '',
-      year: '',
-      examType: '',
-      semester: '',
-    });
-  };
-
-  const handleUpdatePaper = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingId) return;
-
-    try {
-      const updateData: Partial<PYQPaper> = {
-        subjectName: editFormData.subjectName,
-        subjectCode: editFormData.subjectCode,
-        year: parseInt(editFormData.year),
-        examType: editFormData.examType as ExamType,
-        semester: parseInt(editFormData.semester),
-      };
-      await pyqApi.update(editingId, updateData);
-      setSuccess('Paper updated successfully');
-      setEditingId(null);
-      setEditFormData({
-        subjectName: '',
-        subjectCode: '',
-        year: '',
-        examType: '',
-        semester: '',
-      });
-      fetchPapers();
-    } catch (err: unknown) {
-      let errorMessage = 'Failed to update paper';
-      const axiosError = err as any;
-      if (axiosError.response?.data?.message) {
-        errorMessage = axiosError.response.data.message;
-      } else if (err instanceof Error) {
-        errorMessage = err.message;
-      }
-      setError(errorMessage);
-    }
+    setEditPaper(paper);
+    setEditOpen(true);
   };
 
   const handleView = (paper: PYQPaper) => {
@@ -251,7 +178,7 @@ export default function PapersPage() {
       // Track download for stats (fire and forget)
       pyqApi.trackDownload(paper._id).catch(() => {});
     } catch (err: unknown) {
-      setError('Failed to download paper');
+      toast.error('Failed to download paper');
     }
   };
 
@@ -265,27 +192,27 @@ export default function PapersPage() {
   };
 
   const handleBulkVerify = async () => {
-    if (selected.length === 0) return setError('No papers selected');
+    if (selected.length === 0) return toast.error('No papers selected');
     try {
       await Promise.all(selected.map((id) => pyqApi.verify(id)));
-      setSuccess('Selected papers verified');
+      toast.success('Selected papers verified');
       setSelected([]);
-      fetchPapers({ page, limit: pageSize });
+      fetchPapers({ page, limit: pageSize, silent: true });
     } catch (err: unknown) {
-      setError('Failed to verify selected papers');
+      toast.error('Failed to verify selected papers');
     }
   };
 
   const handleBulkDelete = async () => {
-    if (selected.length === 0) return setError('No papers selected');
+    if (selected.length === 0) return toast.error('No papers selected');
     if (!confirm('Delete selected papers? This cannot be undone.')) return;
     try {
       await Promise.all(selected.map((id) => pyqApi.delete(id)));
-      setSuccess('Selected papers deleted');
+      toast.success('Selected papers deleted');
       setSelected([]);
-      fetchPapers({ page, limit: pageSize });
+      fetchPapers({ page, limit: pageSize, silent: true });
     } catch (err: unknown) {
-      setError('Failed to delete selected papers');
+      toast.error('Failed to delete selected papers');
     }
   };
 
@@ -327,93 +254,18 @@ export default function PapersPage() {
           </Link>
         </div>
 
-        {error && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {success && (
-          <Alert className="mb-4 bg-green-50 border-green-200">
-            <AlertDescription className="text-green-800">{success}</AlertDescription>
-          </Alert>
-        )}
-
-        {editingId && (
-          <Card className="mb-6 bg-blue-50">
-            <CardHeader>
-              <CardTitle>Edit Paper</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleUpdatePaper} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Subject Name *</label>
-                    <input
-                      type="text"
-                      value={editFormData.subjectName}
-                      onChange={(e) => setEditFormData({ ...editFormData, subjectName: e.target.value })}
-                      className="w-full border rounded px-2 py-1"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Subject Code</label>
-                    <input
-                      type="text"
-                      value={editFormData.subjectCode}
-                      onChange={(e) => setEditFormData({ ...editFormData, subjectCode: e.target.value })}
-                      className="w-full border rounded px-2 py-1"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Year *</label>
-                    <input
-                      type="number"
-                      value={editFormData.year}
-                      onChange={(e) => setEditFormData({ ...editFormData, year: e.target.value })}
-                      className="w-full border rounded px-2 py-1"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Exam Type *</label>
-                    <select
-                      value={editFormData.examType}
-                      onChange={(e) => setEditFormData({ ...editFormData, examType: e.target.value })}
-                      className="w-full border rounded px-2 py-1"
-                      required
-                    >
-                      <option value="">Select exam type</option>
-                      <option value="mid-term">Mid-Term</option>
-                      <option value="end-term">End-Term</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Semester *</label>
-                    <input
-                      type="number"
-                      value={editFormData.semester}
-                      onChange={(e) => setEditFormData({ ...editFormData, semester: e.target.value })}
-                      className="w-full border rounded px-2 py-1"
-                      min="1"
-                      max="10"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button type="submit" size="sm">Save Changes</Button>
-                  <Button type="button" variant="outline" size="sm" onClick={handleCancelEdit}>Cancel</Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        )}
+        <EditPaperDialog
+          paper={editPaper}
+          open={editOpen}
+          onOpenChange={(next) => {
+            setEditOpen(next);
+            if (!next) setEditPaper(null);
+          }}
+          onSaved={(message) => {
+            toast.success(message);
+            fetchPapers({ silent: true });
+          }}
+        />
 
         <div className="mb-4 text-sm text-muted-foreground flex items-center justify-between">
           <div>
@@ -445,7 +297,9 @@ export default function PapersPage() {
             </Select>
             <div className="flex items-center gap-2">
               <Button size="sm" onClick={selectAllOnPage}>{selected.length === filteredPapers.length ? 'Unselect' : 'Select All'}</Button>
-              <Button size="sm" onClick={handleBulkVerify} disabled={selected.length===0}>Verify Selected</Button>
+              {canVerify && (
+                <Button size="sm" onClick={handleBulkVerify} disabled={selected.length===0}>Verify Selected</Button>
+              )}
               {canModify && (
                 <Button size="sm" variant="destructive" onClick={handleBulkDelete} disabled={selected.length===0}>Delete Selected</Button>
               )}
@@ -486,7 +340,7 @@ export default function PapersPage() {
                       <Button size="sm" variant="outline" onClick={() => handleView(paper)}>
                         View
                       </Button>
-                      {!paper.verified && (
+                      {!paper.verified && canVerify && (
                         <Button size="sm" variant="default" onClick={() => handleVerify(paper._id)}>
                           ✓ Verify
                         </Button>
@@ -496,7 +350,11 @@ export default function PapersPage() {
                       </Button>
                       {canModify && (
                         <>
-                          <Button size="sm" variant="secondary" onClick={() => handleEdit(paper)}>
+                          <Button
+                            size="sm"
+                            className="bg-slate-900 text-white hover:bg-slate-800"
+                            onClick={() => handleEdit(paper)}
+                          >
                             Edit
                           </Button>
                           <Button size="sm" variant="destructive" onClick={() => handleDelete(paper._id)}>
@@ -517,6 +375,17 @@ export default function PapersPage() {
                       <p className="text-muted-foreground">Branch</p>
                       <p className="font-medium">{getBranchName(paper)}</p>
                     </div>
+                    {(paper.additionalBranchIds?.length ?? 0) > 0 && (
+                      <div>
+                        <p className="text-muted-foreground">Additional Branches</p>
+                        <p className="font-medium">
+                          {paper.additionalBranchIds!
+                            .map((entry) => (typeof entry === 'string' ? entry : entry?.name))
+                            .filter(Boolean)
+                            .join(', ')}
+                        </p>
+                      </div>
+                    )}
                     <div>
                       <p className="text-muted-foreground">Session</p>
                       <p className="font-medium">{getSessionName(paper)}</p>
