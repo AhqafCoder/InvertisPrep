@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ViewableAvatar } from '@/components/admin/viewable-avatar';
+import { TicketThread } from '@/components/admin/ticket-thread';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CalendarDays, CheckCircle2, Loader2, Trash2, XCircle } from 'lucide-react';
@@ -22,6 +23,7 @@ interface PaperRequestDetailDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Page-level handlers — the dialog only renders state, the page owns it. */
   onStatusChange: (id: string, status: 'fulfilled' | 'rejected' | 'pending') => void;
+  onRequestUpdate?: (updated: PaperRequest) => void;
   onDelete: (id: string) => void;
   actingId: string | null;
 }
@@ -71,6 +73,7 @@ export function PaperRequestDetailDialog({
   open,
   onOpenChange,
   onStatusChange,
+  onRequestUpdate,
   onDelete,
   actingId,
 }: PaperRequestDetailDialogProps) {
@@ -84,6 +87,15 @@ export function PaperRequestDetailDialog({
 
   const requester = getRequester(request);
   const busy = actingId === request._id;
+
+  const sendReply = async (body: string) => {
+    const res = await paperRequestApi.reply(request._id, body);
+    if (res.success && res.data) {
+      onRequestUpdate?.(res.data);
+    } else {
+      throw new Error(res.message || 'Failed to send reply');
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -164,6 +176,15 @@ export function PaperRequestDetailDialog({
               {request.note || 'No additional details provided.'}
             </p>
           </div>
+
+          {/* Ticket thread */}
+          <TicketThread
+            messages={request.messages ?? []}
+            canReply={canModify}
+            onReply={sendReply}
+            requesterName={requester.name}
+            placeholder="Reply to the student…"
+          />
 
           {/* Actions */}
           {canModify && (

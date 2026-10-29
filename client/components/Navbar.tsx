@@ -53,6 +53,7 @@ import {
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { supportApi } from '@/lib/api';
 import { buildLoginHref } from '@/lib/canonical';
 
 // ============================================================
@@ -266,8 +267,26 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [isHiddenByFooter, setIsHiddenByFooter] = useState(false);
+  const [unreadReplies, setUnreadReplies] = useState(0);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const navRef = useRef<HTMLElement>(null);
+
+  // Unread staff replies across the user's tickets → the dot on the dropdown.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    const load = () =>
+      supportApi
+        .unreadCount()
+        .then((n) => !cancelled && setUnreadReplies(n))
+        .catch(() => {});
+    load();
+    const interval = setInterval(load, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [user]);
 
   // Carry the current location into the login page so the user can be
   // returned here (on the canonical domain) after authentication.
@@ -353,7 +372,7 @@ export default function Navbar() {
 
   const careerLinks: MenuLink[] = [
     { title: 'ATS Score Checker', href: '/ats-score', description: 'Check how your resume scores against ATS filters.', icon: <Target />, badge: 'new' },
-    { title: 'Resume Builder', href: user ? '/resumes' : '/resume-builder', description: 'Create, manage and export ATS-friendly resumes.', icon: <FileCheck2 />, badge: 'new' },
+    { title: 'Resume Builder', href: '/resume-builder', description: 'Create, manage and export ATS-friendly resumes.', icon: <FileCheck2 />, badge: 'new' },
     { title: 'Career Hub', href: '/coming-soon/career', description: 'Internships, jobs & hackathons for students.', icon: <Briefcase />, badge: 'soon' },
   ];
 
@@ -540,6 +559,17 @@ export default function Navbar() {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
+                    <Link href="/my-requests" className="w-full cursor-pointer">
+                      <Bug className="mr-2 h-4 w-4 text-slate-500" />
+                      <span className="flex-1">My Requests</span>
+                      {unreadReplies > 0 && (
+                        <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[10px] font-bold text-white">
+                          {unreadReplies}
+                        </span>
+                      )}
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
                     <Link href="/wallet" className="w-full cursor-pointer">
                       <Wallet className="mr-2 h-4 w-4 text-slate-500" />
                       <span className="flex-1">QCWallet</span>
@@ -548,11 +578,6 @@ export default function Navbar() {
                           {user.qcoins.toLocaleString('en-IN')} QC
                         </span>
                       )}
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/pyq/upload" className="w-full cursor-pointer">
-                      <UploadCloud className="mr-2 h-4 w-4 text-slate-500" /> Upload PYQ
                     </Link>
                   </DropdownMenuItem>
 
@@ -781,15 +806,8 @@ function MobileMenu({
                 </span>
               )}
             </Link>
-            <Link
-              href="/pyq/upload"
-              onClick={onNavigate}
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-zinc-100 hover:text-zinc-900 group"
-            >
-              <UploadCloud className="size-4 text-zinc-400 group-hover:text-zinc-800 transition-colors" /> Upload PYQ
-            </Link>
 
-{canEnterAdmin(user) ? (
+            {canEnterAdmin(user) ? (
               <Link
                 href="/admin/dashboard"
                 onClick={onNavigate}
