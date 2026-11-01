@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import { fetcher } from '@/lib/fetcher';
 import { matchesQuery } from '@/lib/search';
 import { InstagramFollowGate, isUnlocked } from '@/components/instagram-follow-gate';
+import { useInstagramGateSetting } from '@/hooks/useInstagramGateSetting';
 import { pyqApi, sessionApi, reportApi, departmentApi, paperRequestApi } from '@/lib/api';
-import type { PYQPaper, Department, Branch, Session, APIResponse } from '@/types';
+import type { PYQPaper, Department, Branch, Session, APIResponse, PaperRequest } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -44,6 +45,8 @@ export default function DepartmentPYQPage() {
   );
   const department = deptRes?.data || null;
   const deptObjectId = department?._id;
+
+  const { enabled: instagramPopupEnabled } = useInstagramGateSetting();
 
   const { data: branchesRes, error: branchesError } = useSWR<APIResponse<Branch[]>>(
     deptObjectId ? `/departments/${deptObjectId}/branches` : null,
@@ -178,11 +181,13 @@ export default function DepartmentPYQPage() {
     }
   };
 
-  // Open the protected viewer, counting the view first (fire-and-forget so a
-  // tracking blip never blocks the paper).
+  // Open the protected viewer IN A NEW TAB, counting the view first
+  // (fire-and-forget so a tracking blip never blocks the paper). Opening in a
+  // new tab lets students queue multiple papers and keeps this page's search
+  // filters/search box exactly where they left them.
   const openPaper = (paper: PYQPaper) => {
     pyqApi.trackView(paper._id).catch(() => {});
-    router.push(`/view/${paper._id}?type=pyq`);
+    window.open(`/view/${paper._id}?type=pyq`, '_blank', 'noopener,noreferrer');
   };
 
   const handleView = (paper: PYQPaper) => {
@@ -191,8 +196,9 @@ export default function DepartmentPYQPage() {
       return;
     }
     // Staff/students keep the same student gate; only staff skip it.
+    // Also bypass if the follow popup is disabled in platform settings.
     const staff = user.role === 'admin' || user.role === 'super-admin' || user.role === 'staff';
-    if (staff || isUnlocked(user.id)) {
+    if (!instagramPopupEnabled || staff || isUnlocked(user.id)) {
       openPaper(paper);
       return;
     }
@@ -273,17 +279,21 @@ export default function DepartmentPYQPage() {
   // Existing paper found for the exact subject code + term + year the student
   // typed. When set, we show "already exists" instead of letting them submit.
   const [existingPaper, setExistingPaper] = useState<PYQPaper | null>(null);
+  const [existingPendingRequest, setExistingPendingRequest] = useState<PaperRequest | null>(null);
   const [checkingExisting, setCheckingExisting] = useState(false);
+  const submittingRef = useRef(false);
 
   // Load picker data whenever the request modal opens (department preselected
   // to the page the student is already browsing).
   useEffect(() => {
     if (!isRequestModalOpen) return;
     let cancelled = false;
+    submittingRef.current = false;
     const load = async () => {
       setRequestError('');
       setRequestSuccess('');
       setExistingPaper(null);
+      setExistingPendingRequest(null);
       setRequestBranches([]);
       try {
         const deptRes = await departmentApi.getAll();
@@ -338,6 +348,7 @@ export default function DepartmentPYQPage() {
     const year = parseInt(requestForm.year, 10);
     if (!code || Number.isNaN(year)) {
       setExistingPaper(null);
+      setExistingPendingRequest(null);
       setCheckingExisting(false);
       return;
     }
@@ -352,9 +363,15 @@ export default function DepartmentPYQPage() {
           examType: requestForm.examType !== 'any' ? requestForm.examType : undefined,
           departmentId: requestForm.departmentId || undefined,
         });
-        if (!cancelled) setExistingPaper(res.exists && res.data ? res.data : null);
+        if (!cancelled) {
+          setExistingPaper(res.exists && res.data ? res.data : null);
+          setExistingPendingRequest(res.alreadyRequested && res.existingRequest ? res.existingRequest : null);
+        }
       } catch (err: unknown) {
-        if (!cancelled) setExistingPaper(null);
+        if (!cancelled) {
+          setExistingPaper(null);
+          setExistingPendingRequest(null);
+        }
       } finally {
         if (!cancelled) setCheckingExisting(false);
       }
@@ -374,25 +391,38 @@ export default function DepartmentPYQPage() {
 
   const handleRequestSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current || submittingRequest) return;
+    submittingRef.current = true;
+
     setRequestError('');
     setRequestSuccess('');
 
     if (!requestForm.departmentId || !requestForm.branchId || !requestForm.subjectName.trim()) {
       setRequestError('Department, branch and subject name are required.');
+      submittingRef.current = false;
       return;
     }
     if (!requestForm.subjectCode.trim()) {
       setRequestError('Subject code is required.');
+      submittingRef.current = false;
       return;
     }
     const year = parseInt(requestForm.year, 10);
     if (Number.isNaN(year) || year < 2000 || year > 2100) {
       setRequestError('Enter a valid year (2000–2100).');
+      submittingRef.current = false;
       return;
     }
     // Guard against a duplicate request when the exact paper already exists.
     if (existingPaper) {
       setRequestError('This paper already exists on InvertisPrep.');
+      submittingRef.current = false;
+      return;
+    }
+    // Guard against duplicate request when already requested by someone
+    if (existingPendingRequest) {
+      setRequestError('This paper has already been requested. Our team is actively searching for it!');
+      submittingRef.current = false;
       return;
     }
 
@@ -424,25 +454,35 @@ export default function DepartmentPYQPage() {
             year: '',
             note: '',
           }));
+          submittingRef.current = false;
         }, 1800);
       } else {
         setRequestError(res.message || 'Failed to submit request.');
+        submittingRef.current = false;
       }
     } catch (err: any) {
+      submittingRef.current = false;
       if (err.response?.status === 409) {
-        // Server-side duplicate guard: fetch the existing paper so we can
-        // offer the "View it" shortcut right in the error state.
-        setRequestError(err.response?.data?.message || 'This paper already exists on InvertisPrep.');
-        try {
-          const check = await paperRequestApi.check({
-            subjectCode: requestForm.subjectCode.trim(),
-            year,
-            examType: requestForm.examType !== 'any' ? requestForm.examType : undefined,
-            departmentId: requestForm.departmentId || undefined,
-          });
-          if (check.exists && check.data) setExistingPaper(check.data);
-        } catch {
-          /* the error message alone is enough */
+        const data = err.response?.data;
+        if (data?.code === 'REQUEST_EXISTS') {
+          setExistingPendingRequest(data.existingRequest || null);
+          setRequestError(data.message || 'This paper has already been requested. Our team is working on it!');
+        } else {
+          // Server-side duplicate guard: fetch the existing paper so we can
+          // offer the "View it" shortcut right in the error state.
+          setRequestError(data?.message || 'This paper already exists on InvertisPrep.');
+          try {
+            const check = await paperRequestApi.check({
+              subjectCode: requestForm.subjectCode.trim(),
+              year,
+              examType: requestForm.examType !== 'any' ? requestForm.examType : undefined,
+              departmentId: requestForm.departmentId || undefined,
+            });
+            if (check.exists && check.data) setExistingPaper(check.data);
+            if (check.alreadyRequested && check.existingRequest) setExistingPendingRequest(check.existingRequest);
+          } catch {
+            /* the error message alone is enough */
+          }
         }
       } else {
         setRequestError(
@@ -963,6 +1003,34 @@ export default function DepartmentPYQPage() {
                   </div>
                 </div>
               )}
+              {existingPendingRequest && !existingPaper && !requestSuccess && (
+                <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50/90 p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-500 text-xs font-bold text-white">
+                      ⏳
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-amber-900">
+                        We&apos;re already working on this request!
+                      </p>
+                      <p className="mt-0.5 text-xs text-amber-800">
+                        A request for{' '}
+                        <span className="font-semibold">
+                          {existingPendingRequest.subjectName}
+                          {existingPendingRequest.subjectCode ? ` (${existingPendingRequest.subjectCode})` : ''}
+                        </span>{' '}
+                        for {existingPendingRequest.year}
+                        {existingPendingRequest.examType === 'mid-term'
+                          ? ' · Mid-Term'
+                          : existingPendingRequest.examType === 'end-term'
+                            ? ' · End-Term'
+                            : ''}
+                        {' '}has already been submitted. Our team is actively finding and verifying this paper, so you don&apos;t need to request it again.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
               {requestSuccess ? (
                 <div className="space-y-4 py-6 text-center">
                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-xl font-bold text-emerald-600">
@@ -1060,6 +1128,11 @@ export default function DepartmentPYQPage() {
                           Already uploaded — see the notice above.
                         </p>
                       )}
+                      {existingPendingRequest && !existingPaper && !checkingExisting && (
+                        <p className="mt-1 text-xs font-medium text-amber-600">
+                          Already requested — we&apos;re working on it!
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -1120,7 +1193,7 @@ export default function DepartmentPYQPage() {
                     <Button
                       type="submit"
                       className="bg-slate-900 text-white hover:bg-slate-700"
-                      disabled={submittingRequest || checkingExisting || Boolean(existingPaper)}
+                      disabled={submittingRequest || checkingExisting || Boolean(existingPaper) || Boolean(existingPendingRequest)}
                     >
                       {submittingRequest ? (
                         <>
@@ -1129,6 +1202,8 @@ export default function DepartmentPYQPage() {
                         </>
                       ) : existingPaper ? (
                         'Paper already exists'
+                      ) : existingPendingRequest ? (
+                        'Already requested'
                       ) : (
                         <>
                           <Send className="mr-2 h-4 w-4" />

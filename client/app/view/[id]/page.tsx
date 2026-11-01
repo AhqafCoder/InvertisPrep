@@ -3,8 +3,9 @@
 import { useEffect, useState, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
-import { pdfApi } from '@/lib/api';
+import { pdfApi, pyqApi } from '@/lib/api';
 import { InstagramFollowGate, isUnlocked } from '@/components/instagram-follow-gate';
+import { useInstagramGateSetting } from '@/hooks/useInstagramGateSetting';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2, ArrowLeft, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -47,15 +48,18 @@ function ViewPDFContent() {
   const id = params.id as string;
   const type = (searchParams.get('type') as 'pyq' | 'syllabus') || 'pyq';
 
+  const { enabled: instagramPopupEnabled } = useInstagramGateSetting();
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Instagram follow gate — shown once per user before a PYQ paper is fetched.
   // Syllabus documents and staff accounts skip it entirely.
+  // Also skipped if instagramPopupEnabled is toggled off in platform settings.
   const [unlocked, setUnlocked] = useState(false);
   const gateRequired =
     type === 'pyq' &&
     !!user &&
+    instagramPopupEnabled &&
     user.role !== 'admin' &&
     user.role !== 'super-admin' &&
     user.role !== 'srt' &&
@@ -88,6 +92,12 @@ function ViewPDFContent() {
         const blob = await pdfApi.view(id, type);
         setPdfBlob(blob);
         setError(null);
+        // Direct-link opens must count as a paper view too (the browse list
+        // fires trackView before navigating; the 30-min dedupe window on the
+        // server means this is a no-op when both fire).
+        if (type === 'pyq') {
+          pyqApi.trackView(id).catch(() => {});
+        }
       } catch (err: any) {
         console.error('Error fetching PDF:', err);
 
