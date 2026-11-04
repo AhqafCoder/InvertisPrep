@@ -462,14 +462,22 @@ export interface InvertisEvent {
   title: string;
   category: string;
   date: string;
+  /** Real sortable first-day date (ISO string). Optional for legacy rows. */
+  startDate?: string;
   time: string;
   venue: string;
   organizer: string;
   description: string;
   longDescription: string;
+  /** Rich HTML body from the admin editor; falls back to longDescription. */
+  content?: string;
   image: string;
   featured?: boolean;
+  /** 'draft' events are hidden from the public site (admin-only). */
+  status?: 'draft' | 'published';
   registrationOpen: boolean;
+  /** External registration link (Google Form, club page, ...). */
+  registrationUrl?: string;
   timeline: string[];
   rules: string[];
   createdAt?: string;

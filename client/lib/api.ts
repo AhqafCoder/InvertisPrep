@@ -1001,8 +1001,15 @@ export const aiApi = {
 
 // Event API
 export const eventApi = {
+  /** Published events only — public site. */
   getAll: async (): Promise<APIResponse<InvertisEvent[]>> => {
     const { data } = await apiClient.get<APIResponse<InvertisEvent[]>>('/events');
+    return data;
+  },
+
+  /** Every event including drafts — admin console (events.view). */
+  getAllAdmin: async (): Promise<APIResponse<InvertisEvent[]>> => {
+    const { data } = await apiClient.get<APIResponse<InvertisEvent[]>>('/events/manage/all');
     return data;
   },
 
