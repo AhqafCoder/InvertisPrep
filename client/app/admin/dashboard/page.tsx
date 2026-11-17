@@ -145,6 +145,8 @@ export default function AdminDashboard() {
 
   const [loading, setLoading] = useState(true);
   const [warning, setWarning] = useState<string | null>(null);
+  const [monitorFailed, setMonitorFailed] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   const [detailUserId, setDetailUserId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -159,6 +161,8 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchAll = async () => {
       let failed = false;
+      setWarning(null);
+      setLoading(true);
 
       // SRT has no user management access — skip adminUserApi calls (they'd 403)
       const [u, p, un, r, b, e, nu, lb] = await Promise.all([
@@ -223,7 +227,7 @@ export default function AdminDashboard() {
     };
 
     fetchAll();
-  }, []);
+  }, [retryNonce, canViewUsers]);
 
   // Live + growth analytics. activity.view → both panels; marketing.view →
   // growth only. Auto-refreshes so the dashboard genuinely feels live.
@@ -238,11 +242,16 @@ export default function AdminDashboard() {
       ]);
       if (ov?.success && ov.data) setOverview(ov.data);
       if (on?.success && Array.isArray(on.data)) setOnlineUsers(on.data);
+      // Surface failure instead of spinning skeletons forever — but only
+      // while nothing has ever loaded (transient poll blips stay quiet once
+      // real data is on screen).
+      if (!ov?.success && !ov?.data) setMonitorFailed(true);
+      else setMonitorFailed(false);
     };
     load();
     const interval = setInterval(load, 30_000);
     return () => clearInterval(interval);
-  }, [canMonitor, canActivity]);
+  }, [canMonitor, canActivity, retryNonce]);
 
   // Range-picker graphs — each chart has its own Vercel-style range dropdown
   // and stat header (selected-range total + % change vs the previous window).
@@ -432,8 +441,16 @@ export default function AdminDashboard() {
 
       {/* Warning strip */}
       {warning && (
-        <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-700">
-          {warning}
+        <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-700">
+          <span className="flex-1">{warning}</span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 border-amber-300 text-amber-700 hover:bg-amber-100 hover:text-amber-800"
+            onClick={() => setRetryNonce((n) => n + 1)}
+          >
+            Retry
+          </Button>
         </div>
       )}
 
@@ -490,9 +507,18 @@ export default function AdminDashboard() {
                 </Link>
               </div>
               {overview === null && onlineUsers.length === 0 ? (
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                  {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)}
-                </div>
+                monitorFailed && !loading ? (
+                  <div className="flex h-32 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-rose-200 bg-rose-50/40 text-center">
+                    <p className="text-xs font-semibold text-rose-600">Live monitoring data couldn't load</p>
+                    <Button size="sm" variant="outline" onClick={() => setRetryNonce((n) => n + 1)}>
+                      Retry
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                    {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)}
+                  </div>
+                )
               ) : onlineUsers.length === 0 ? (
                 <div className="flex h-32 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-slate-200 text-center">
                   <p className="text-2xl">🌙</p>

@@ -15,6 +15,7 @@ export const siteConfig: {
   keywords: string[];
   openGraphImage: string;
   themeColor: string;
+  creator: { name: string; url: string };
 } = {
   name: "InvertisPrep",
   url: "https://www.invertisprep.in",
@@ -46,6 +47,8 @@ export const siteConfig: {
   ],
   openGraphImage: "/logo.jpeg",
   themeColor: "#4f46e5",
+  // The studio behind InvertisPrep — surfaces in JSON-LD (parentOrganization).
+  creator: { name: "WTFBuilds", url: "https://wtfbuilds.com" },
 };
 
 type SeoOverrides = {
@@ -113,6 +116,12 @@ export function organizationSchema(): Record<string, unknown> {
     url: siteConfig.url,
     logo: `${siteConfig.url}${siteConfig.openGraphImage}`,
     description: siteConfig.description,
+    parentOrganization: {
+      "@type": "Organization",
+      name: siteConfig.creator.name,
+      url: siteConfig.creator.url,
+    },
+    sameAs: [siteConfig.creator.url],
   };
 }
 

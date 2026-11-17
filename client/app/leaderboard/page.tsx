@@ -61,7 +61,7 @@ export default function LeaderboardPage() {
 
   useEffect(() => {
     if (!loading && !user) {
-      router.replace('/login');
+      router.replace('/login?returnUrl=%2Fleaderboard');
     }
   }, [user, loading, router]);
 

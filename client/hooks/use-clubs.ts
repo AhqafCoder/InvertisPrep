@@ -21,20 +21,32 @@ const STATIC_FALLBACK: Club[] = CLUB_LIST.map(toApiClub);
 /**
  * Reads the club list from the API.
  *
+ * `initial` is the server-rendered payload from the page's RSC fetch — when
+ * present it seeds SWR as fallbackData and client-side revalidation is
+ * disabled (the Next data cache refreshes it per revalidate TTL instead).
+ *
  * The static list is the fallback: if the API is unreachable the public
  * page still renders the seeded content rather than an error, so a server
  * hiccup never blanks the page.
  */
-export function useClubs() {
+export function useClubs(initial?: Club[] | null) {
   const {
     data,
     error,
     isLoading,
     mutate,
-  } = useSWR<{ success: boolean; data: Club[] }>('/clubs', fetcher, {
-    revalidateOnFocus: false,
-    shouldRetryOnError: true,
-  });
+  } = useSWR<{ success: boolean; data: Club[] }>(
+    '/clubs',
+    fetcher,
+    initial?.length
+      ? {
+          fallbackData: { success: true, data: initial },
+          revalidateOnFocus: false,
+          revalidateOnMount: false,
+          revalidateIfStale: false,
+        }
+      : { revalidateOnFocus: false, shouldRetryOnError: true }
+  );
 
   const clubs = data?.data?.length ? data.data : STATIC_FALLBACK;
   const isFallback = !data?.data?.length;
@@ -50,8 +62,9 @@ export function useClubs() {
 
 /**
  * Reads a single club from the API, with the static list as the fallback.
+ * `initial` is the server-rendered payload (same contract as useClubs).
  */
-export function useClub(id: string | undefined) {
+export function useClub(id: string | undefined, initial?: Club | null) {
   const {
     data,
     error,
@@ -60,7 +73,14 @@ export function useClub(id: string | undefined) {
   } = useSWR<{ success: boolean; data: Club }>(
     id ? `/clubs/${id}` : null,
     fetcher,
-    { revalidateOnFocus: false }
+    initial
+      ? {
+          fallbackData: { success: true, data: initial },
+          revalidateOnFocus: false,
+          revalidateOnMount: false,
+          revalidateIfStale: false,
+        }
+      : { revalidateOnFocus: false }
   );
 
   const fallback = id ? STATIC_FALLBACK.find((c) => c.id === id) : undefined;

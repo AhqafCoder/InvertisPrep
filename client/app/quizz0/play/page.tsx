@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, X, Swords, Loader2 } from 'lucide-react';
+import { Zap, X, Swords, Loader2, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Spotlight } from '@/components/ui/spotlight';
@@ -18,6 +18,8 @@ function MatchmakingContent() {
   const { joinQueue, leaveQueue, quizState, isConnected } = useQuizSocket();
   const [countdown, setCountdown] = useState(3);
   const [showCountdown, setShowCountdown] = useState(false);
+  const [connectionTimedOut, setConnectionTimedOut] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
   const countdownStarted = useRef(false);
   const redirectRef = useRef<string | null>(null);
 
@@ -31,13 +33,28 @@ function MatchmakingContent() {
     return () => leaveQueue();
   }, [isConnected, subject, joinQueue, leaveQueue]);
 
+  // Connection watchdog — if the quiz server socket never connects, show an
+  // error card instead of "Finding Opponent..." forever. socket.io keeps
+  // retrying in the background, so a later success clears the error.
+  useEffect(() => {
+    if (isConnected) return;
+    const timer = setTimeout(() => setConnectionTimedOut(true), 8000);
+    return () => clearTimeout(timer);
+  }, [isConnected, retryNonce]);
+
+  useEffect(() => {
+    if (isConnected && connectionTimedOut) setConnectionTimedOut(false);
+  }, [isConnected, connectionTimedOut]);
+
+  const handleRetryConnection = useCallback(() => {
+    setConnectionTimedOut(false);
+    setRetryNonce((n) => n + 1);
+  }, []);
+
   // Handle match found → countdown (runs once, won't restart on re-renders)
   useEffect(() => {
     if (countdownStarted.current) return;
     if (quizState.status !== 'countdown' || !quizState.matchId) return;
-
-    console.log('🔍 [DEBUG PlayPage] Match found! status=countdown, matchId=', quizState.matchId);
-    console.log('🔍 [DEBUG PlayPage] Players:', quizState.players.map(p => ({ id: p.id, name: p.name })));
 
     countdownStarted.current = true;
     redirectRef.current = `/quizz0/match/${quizState.matchId}`;
@@ -85,8 +102,41 @@ function MatchmakingContent() {
         spread={100}
       />
 
+      {/* ─── Connection Error State ────────────────────────────── */}
+      {!showCountdown && connectionTimedOut && !isConnected && (
+        <div className="relative z-10 min-h-screen flex items-center justify-center px-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-center max-w-md w-full"
+          >
+            <div className="w-32 h-32 mx-auto mb-8 rounded-full bg-red-500/10 border-2 border-red-500/40 flex items-center justify-center">
+              <WifiOff className="h-12 w-12 text-red-400" />
+            </div>
+            <h1 className="text-2xl font-bold text-white mb-3">Can't reach the quiz server</h1>
+            <p className="text-gray-400 mb-8">
+              We couldn't connect to the Quizzo service. Check your internet connection and try again.
+            </p>
+            <div className="flex items-center justify-center gap-3">
+              <Button onClick={handleRetryConnection} className="bg-indigo-500 hover:bg-indigo-600 text-white">
+                <Loader2 className="h-4 w-4 mr-2" />
+                Retry
+              </Button>
+              <Button
+                onClick={handleCancel}
+                variant="outline"
+                className="border-gray-700 text-gray-400 hover:text-white hover:border-gray-500"
+              >
+                <X className="h-4 w-4 mr-2" />
+                Back
+              </Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       {/* ─── Searching State ───────────────────────────────── */}
-      {!showCountdown && (
+      {!showCountdown && !connectionTimedOut && (
         <div className="relative z-10 min-h-screen flex items-center justify-center px-4">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}

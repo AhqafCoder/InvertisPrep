@@ -55,8 +55,8 @@ const emptyProject = (): ResumeProject => ({ name: '', url: '', description: '',
 const emptyLink = (): ResumeLink => ({ label: '', url: '' });
 
 export function createStarterResume(forUser?: { name?: string; email?: string; phoneNumber?: string } | null): ResumeDraft {
-  const userName = forUser?.name?.trim() || 'Ahqaf Ali';
-  const userEmail = forUser?.email?.trim() || 'beddylea@gmail.com';
+  const userName = forUser?.name?.trim() || 'Demo Student';
+  const userEmail = forUser?.email?.trim() || 'demo.student@example.com';
   const userPhone = forUser?.phoneNumber?.trim() || '+1-555-0100';
   return {
     title: 'ATS Friendly Resume',
@@ -67,9 +67,9 @@ export function createStarterResume(forUser?: { name?: string; email?: string; p
       phone: userPhone,
       location: 'San Francisco, CA',
       links: [
-        { label: 'GitHub', url: 'github.com/ahqafcoder' },
-        { label: 'LinkedIn', url: 'linkedin.com/in/bedivere-lea' },
-        { label: 'Instagram', url: 'instagram.com/ahqafali0403' },
+        { label: 'GitHub', url: 'github.com/demo-student' },
+        { label: 'LinkedIn', url: 'linkedin.com/in/demo-student' },
+        { label: 'Instagram', url: 'instagram.com/demo.student' },
       ],
     },
     summary: 'Resourceful Developer with 11 years of experience in designing and developing user interfaces, testing and training employees. Skilled at utilizing a wide variety of tools and programs to provide effective applications.',

@@ -7,7 +7,30 @@ import type { NextConfig } from "next";
 const API_URL = process.env.API_URL ;
 const PDF_API_URL = process.env.PDF_API_URL ;
 
+// Production-only headers. X-Frame-Options DENY stops clickjacking and
+// third-party embedding; the rest is standard hardening. (A full CSP is
+// intentionally not set yet — inline scripts from AdSense/Analytics make
+// nonce-based CSP fiddly; revisit if those are ever removed.)
+const securityHeaders = [
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'X-Frame-Options', value: 'DENY' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+];
+
 const nextConfig: NextConfig = {
+  // Don't advertise the framework version (X-Powered-By: Next.js).
+  poweredByHeader: false,
+
+  // Strip console.* from the production browser bundle (keeps error/warn so
+  // real issues still surface) — shrinks output and removes dev chatter.
+  compiler: {
+    removeConsole:
+      process.env.NODE_ENV === 'production'
+        ? { exclude: ['error', 'warn'] }
+        : undefined,
+  },
+
   images: {
     remotePatterns: [
       {
@@ -26,6 +49,14 @@ const nextConfig: NextConfig = {
       { source: '/backend/:path*', destination: `${API_URL}/:path*` },
       // /pdfapi/* → PDF microservice (PYQ CRUD, watermarked PDFs)
       { source: '/pdfapi/:path*', destination: `${PDF_API_URL}/:path*` },
+    ];
+  },
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: securityHeaders,
+      },
     ];
   },
 };

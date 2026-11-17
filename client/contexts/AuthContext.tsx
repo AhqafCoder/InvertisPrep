@@ -135,6 +135,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
+    // Capture the role before clearing state — students land on /login,
+    // staff on the admin login.
+    const wasStaff = user?.role === 'admin' || user?.role === 'super-admin' || user?.role === 'srt';
     try {
       await authApi.logout();
     } catch (error) {
@@ -143,7 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      router.push('/admin/login');
+      router.push(wasStaff ? '/admin/login' : '/login');
     }
   };
 
