@@ -318,17 +318,26 @@ export const setWelcomeEmailEnabled = async (enabled) => {
 // EmailNotify, cached briefly. Fires from paperRequestController at request
 // creation and at triage-fulfill. Never throws / never blocks the request flow.
 
+// Email notification settings cache (uses settingsService)
 const NOTIFY_TTL_MS = 60 * 1000;
 const notifyCache = new Map(); // key -> { enabled, expires }
-const notifyDefault = { requestAck: true, requestFulfilled: true, careerAck: true };
+const notifyDefault = { requestAck: true, requestFulfilled: true, careerAck: true, welcomeEmail: true };
 
 const isNotifyEnabled = async (key) => {
   const hit = notifyCache.get(key);
   if (hit && hit.expires > Date.now()) return hit.enabled;
   try {
-    const { EmailNotify } = await import('../models/EmailNotify.js');
-    const doc = await EmailNotify.findOne({ key }).lean();
-    const enabled = doc ? doc.enabled !== false : notifyDefault[key] !== false;
+    // Use settingsService for centralized toggle management
+    const { getSetting } = await import('./settingsService.js');
+    // Map old keys to new settings keys
+    const settingsKeyMap = {
+      requestAck: 'paperRequestAckEnabled',
+      requestFulfilled: 'paperRequestFulfilledEnabled',
+      careerAck: 'careerApplicationAckEnabled',
+      welcomeEmail: 'welcomeEmailEnabled',
+    };
+    const settingsKey = settingsKeyMap[key] || key;
+    const enabled = await getSetting(settingsKey, notifyDefault[key] !== false);
     notifyCache.set(key, { enabled, expires: Date.now() + NOTIFY_TTL_MS });
     return enabled;
   } catch {
@@ -337,23 +346,28 @@ const isNotifyEnabled = async (key) => {
 };
 
 export const setNotifyEnabled = async (key, enabled) => {
-  const { EmailNotify } = await import('../models/EmailNotify.js');
-  await EmailNotify.findOneAndUpdate(
-    { key },
-    { $set: { enabled: Boolean(enabled) } },
-    { upsert: true, new: true }
-  );
+  // This is kept for backward compatibility but now delegates to settingsService
+  const { setSetting } = await import('./settingsService.js');
+  const settingsKeyMap = {
+    requestAck: 'paperRequestAckEnabled',
+    requestFulfilled: 'paperRequestFulfilledEnabled',
+    careerAck: 'careerApplicationAckEnabled',
+    welcomeEmail: 'welcomeEmailEnabled',
+  };
+  const settingsKey = settingsKeyMap[key] || key;
+  await setSetting(settingsKey, Boolean(enabled));
   notifyCache.set(key, { enabled: Boolean(enabled), expires: Date.now() + NOTIFY_TTL_MS });
   return Boolean(enabled);
 };
 
 export const getNotifySettings = async () => {
-  const [requestAck, requestFulfilled, careerAck] = await Promise.all([
+  const [requestAck, requestFulfilled, careerAck, welcomeEmail] = await Promise.all([
     isNotifyEnabled('requestAck'),
     isNotifyEnabled('requestFulfilled'),
     isNotifyEnabled('careerAck'),
+    isNotifyEnabled('welcomeEmail'),
   ]);
-  return { requestAck, requestFulfilled, careerAck };
+  return { requestAck, requestFulfilled, careerAck, welcomeEmail };
 };
 
 // Acknowledgement email the moment a career application lands — confirms we

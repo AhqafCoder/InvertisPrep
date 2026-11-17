@@ -1087,10 +1087,19 @@ export interface SupportMessage {
 // ── Platform Settings & Feature Toggles ──────────────────────────────────────
 export interface PublicSettings {
   instagramPopupEnabled: boolean;
+  welcomeEmailEnabled: boolean;
+  paperRequestAckEnabled: boolean;
+  paperRequestFulfilledEnabled: boolean;
+  careerApplicationAckEnabled: boolean;
 }
 
 export interface PlatformSettings {
   instagramPopupEnabled: boolean;
+  // Email feature toggles
+  welcomeEmailEnabled: boolean;
+  paperRequestAckEnabled: boolean;
+  paperRequestFulfilledEnabled: boolean;
+  careerApplicationAckEnabled: boolean;
 }
 
 // ── Career Applications ────────────────────────────────────────────────────────

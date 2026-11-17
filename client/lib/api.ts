@@ -1487,6 +1487,47 @@ export const settingsApi = {
     );
     return data;
   },
+
+  // Email feature toggles
+  updateWelcomeEmail: async (
+    enabled: boolean
+  ): Promise<APIResponse<PlatformSettings>> => {
+    const { data } = await apiClient.put<APIResponse<PlatformSettings>>(
+      '/admin/settings/welcome-email',
+      { enabled }
+    );
+    return data;
+  },
+
+  updatePaperRequestAck: async (
+    enabled: boolean
+  ): Promise<APIResponse<PlatformSettings>> => {
+    const { data } = await apiClient.put<APIResponse<PlatformSettings>>(
+      '/admin/settings/paper-request-ack',
+      { enabled }
+    );
+    return data;
+  },
+
+  updatePaperRequestFulfilled: async (
+    enabled: boolean
+  ): Promise<APIResponse<PlatformSettings>> => {
+    const { data } = await apiClient.put<APIResponse<PlatformSettings>>(
+      '/admin/settings/paper-request-fulfilled',
+      { enabled }
+    );
+    return data;
+  },
+
+  updateCareerApplicationAck: async (
+    enabled: boolean
+  ): Promise<APIResponse<PlatformSettings>> => {
+    const { data } = await apiClient.put<APIResponse<PlatformSettings>>(
+      '/admin/settings/career-application-ack',
+      { enabled }
+    );
+    return data;
+  },
 };
 
 // Career API
