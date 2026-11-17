@@ -2,6 +2,7 @@
 
 import { paperRequestApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { hasPermission } from '@/lib/permissions';
 import type { PaperRequest } from '@/types';
 import {
   Dialog,
@@ -10,7 +11,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ViewableAvatar } from '@/components/admin/viewable-avatar';
+import { TicketThread } from '@/components/admin/ticket-thread';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CalendarDays, CheckCircle2, Loader2, Trash2, XCircle } from 'lucide-react';
@@ -21,6 +23,7 @@ interface PaperRequestDetailDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Page-level handlers — the dialog only renders state, the page owns it. */
   onStatusChange: (id: string, status: 'fulfilled' | 'rejected' | 'pending') => void;
+  onRequestUpdate?: (updated: PaperRequest) => void;
   onDelete: (id: string) => void;
   actingId: string | null;
 }
@@ -70,17 +73,29 @@ export function PaperRequestDetailDialog({
   open,
   onOpenChange,
   onStatusChange,
+  onRequestUpdate,
   onDelete,
   actingId,
 }: PaperRequestDetailDialogProps) {
   const { user } = useAuth();
   const isSuperAdmin = user?.role === 'super-admin';
-  const canModify = user?.role !== 'srt';
+  // Triage is permission-gated — SRT holds requests.view only, while a custom
+  // role may or may not have been granted requests.manage.
+  const canModify = hasPermission(user, 'requests.manage');
 
   if (!request) return null;
 
   const requester = getRequester(request);
   const busy = actingId === request._id;
+
+  const sendReply = async (body: string) => {
+    const res = await paperRequestApi.reply(request._id, body);
+    if (res.success && res.data) {
+      onRequestUpdate?.(res.data);
+    } else {
+      throw new Error(res.message || 'Failed to send reply');
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -96,14 +111,12 @@ export function PaperRequestDetailDialog({
         <div className="space-y-5">
           {/* Requester */}
           <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <Avatar className="h-11 w-11">
-              {requester.picture && (
-                <AvatarImage src={requester.picture} alt={requester.name} />
-              )}
-              <AvatarFallback className="bg-indigo-100 text-sm font-bold text-indigo-700">
-                {requester.name.charAt(0).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
+            <ViewableAvatar
+              src={requester.picture}
+              name={requester.name}
+              className="h-12 w-12"
+              fallbackClassName="bg-indigo-100 text-sm font-bold text-indigo-700"
+            />
             <div className="min-w-0">
               <p className="truncate font-bold text-slate-900">{requester.name}</p>
               <p className="truncate text-sm text-slate-500">{requester.email}</p>
@@ -163,6 +176,15 @@ export function PaperRequestDetailDialog({
               {request.note || 'No additional details provided.'}
             </p>
           </div>
+
+          {/* Ticket thread */}
+          <TicketThread
+            messages={request.messages ?? []}
+            canReply={canModify}
+            onReply={sendReply}
+            requesterName={requester.name}
+            placeholder="Reply to the student…"
+          />
 
           {/* Actions */}
           {canModify && (

@@ -10,6 +10,13 @@ export const PERMISSION_GROUPS = [
     description: 'Dashboard access',
     permissions: [
       { key: 'dashboard.view', label: 'View dashboard', description: 'See the admin dashboard and its stats' },
+      { key: 'dashboard.stats', label: 'Dashboard · stats row', description: 'Headline stats (users, papers, reports, bugs)' },
+      { key: 'dashboard.live', label: 'Dashboard · live users', description: 'Who is online right now' },
+      { key: 'dashboard.growth', label: 'Dashboard · growth', description: 'New signups over time' },
+      { key: 'dashboard.activity', label: 'Dashboard · activity graphs', description: 'Signups & daily active users graphs' },
+      { key: 'dashboard.attention', label: 'Dashboard · needs attention', description: 'Unverified papers, pending reports and bugs' },
+      { key: 'dashboard.newusers', label: 'Dashboard · newest users', description: 'Recently joined users list' },
+      { key: 'dashboard.leaderboard', label: 'Dashboard · leaderboard', description: 'Top contributors list' },
     ],
   },
   {
@@ -29,7 +36,8 @@ export const PERMISSION_GROUPS = [
       { key: 'papers.view', label: 'View papers', description: 'Browse the full uploaded paper list' },
       { key: 'papers.upload', label: 'Upload papers', description: 'Upload new PYQ papers' },
       { key: 'papers.verify', label: 'Verify papers', description: 'Verify or reject uploaded papers' },
-      { key: 'papers.delete', label: 'Edit & delete papers', description: 'Edit paper details or remove them' },
+      { key: 'papers.edit', label: 'Edit papers', description: 'Edit paper details (metadata, branches, session)' },
+      { key: 'papers.delete', label: 'Delete papers', description: 'Super-admin only — remove papers entirely', systemOnly: true },
     ],
   },
   {
@@ -57,6 +65,16 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    id: 'clubs',
+    label: 'Clubs (Abhiruchi)',
+    description: 'Student club pages, their events and RSVPs',
+    permissions: [
+      { key: 'clubs.view', label: 'View clubs', description: 'Open the clubs console and see event registrations' },
+      { key: 'clubs.manage', label: 'Manage clubs', description: 'Edit club pages, events, members and FAQs' },
+      { key: 'clubs.delete', label: 'Delete clubs', description: 'Remove a club and its registrations', systemOnly: true },
+    ],
+  },
+  {
     id: 'moderation',
     label: 'Moderation',
     description: 'Paper requests, reports and bug reports',
@@ -69,32 +87,67 @@ export const PERMISSION_GROUPS = [
       { key: 'bugs.manage', label: 'Manage bug reports', description: 'Update status or delete bug reports' },
     ],
   },
+  {
+    id: 'mail',
+    label: 'Mail Center',
+    description: 'Automail, mailbox, broadcasts and mail logs',
+    permissions: [
+      { key: 'emails.view', label: 'View mail center', description: 'See automail, mailbox, compose and logs' },
+      { key: 'emails.manage', label: 'Manage mail', description: 'Send broadcasts and edit mail templates (super-admin can grant)' },
+    ],
+  },
+  {
+    id: 'monitoring',
+    label: 'Monitoring & Marketing',
+    description: 'Live activity monitor and marketing leads',
+    permissions: [
+      { key: 'activity.view', label: 'View activity monitor', description: 'See who is online, the live event feed and per-user activity trails' },
+      { key: 'marketing.view', label: 'View marketing insights', description: 'See growth analytics and the leads list (contact info included, no IPs)' },
+    ],
+  },
+  {
+    id: 'ai',
+    label: 'AI Features',
+    description: 'AI-assisted tools across the platform',
+    permissions: [
+      { key: 'ai.resume', label: 'Resume Builder AI', description: 'Use AI JD-fill, inline rephrase and section enhancement in resume builder' },
+    ],
+  },
 ] as const;
 
 export const ALL_PERMISSION_KEYS: string[] = PERMISSION_GROUPS.flatMap((g) =>
   g.permissions.map((p) => p.key)
 );
 
-// Reserved for the super-admin — never grantable to custom roles
-export const SYSTEM_ONLY_PERMISSIONS: string[] = ['roles.manage'];
+// Reserved for the super-admin — never grantable to custom or built-in roles
+export const SYSTEM_ONLY_PERMISSIONS: string[] = [
+  'roles.manage',
+  'papers.delete',
+  'clubs.delete',
+];
 export const GRANTABLE_PERMISSION_KEYS: string[] = ALL_PERMISSION_KEYS.filter(
   (key) => !SYSTEM_ONLY_PERMISSIONS.includes(key)
 );
 
-// Built-in roles resolve to fixed sets (mirrors the server). super-admin
-// always passes every check.
+// Fallback permission sets for the editable built-in roles (mirrors the server
+// seeds in server/src/shared/permissions.js). The live list comes from the
+// server on the user object; these apply only to pre-existing cached sessions.
+// 'papers.delete' and 'clubs.delete' are super-admin only; 'papers.edit' and
+// 'clubs.manage' are grantable.
 export const BUILTIN_PERMISSIONS: Record<string, string[]> = {
-  admin: ALL_PERMISSION_KEYS.filter((k) => k !== 'roles.manage'),
+  admin: ALL_PERMISSION_KEYS.filter((k) => !SYSTEM_ONLY_PERMISSIONS.includes(k)),
   srt: [
     'dashboard.view',
     'papers.view',
     'papers.upload',
     'papers.verify',
+    'papers.edit',
     'syllabus.upload',
     'departments.view',
     'branches.view',
     'sessions.view',
     'events.view',
+    'clubs.view',
     'requests.view',
     'reports.view',
     'bugs.view',
@@ -106,12 +159,17 @@ export type PermissionUser = {
   permissions?: string[];
 } | null | undefined;
 
-/** 'all' for super-admin, otherwise the resolved permission key list. */
+/**
+ * 'all' for super-admin, otherwise the resolved permission key list.
+ * Built-in admin/srt prefer the server-provided `permissions` list (their
+ * permission sets are editable), falling back to the hardcoded defaults for
+ * sessions stored before the server sent them.
+ */
 export function userPermissionSet(user: PermissionUser): 'all' | string[] {
   if (!user) return [];
   if (user.role === 'super-admin') return 'all';
-  if (user.role === 'admin') return BUILTIN_PERMISSIONS.admin;
-  if (user.role === 'srt') return BUILTIN_PERMISSIONS.srt;
+  if (user.role === 'admin') return user.permissions ?? BUILTIN_PERMISSIONS.admin;
+  if (user.role === 'srt') return user.permissions ?? BUILTIN_PERMISSIONS.srt;
   if (user.role === 'staff') return user.permissions ?? [];
   return [];
 }
@@ -130,6 +188,31 @@ export function hasAnyPermission(user: PermissionUser, ...keys: string[]): boole
   const set = userPermissionSet(user);
   if (set === 'all') return true;
   return keys.some((key) => set.includes(key));
+}
+
+// ── Dashboard section visibility ────────────────────────────────────────────
+export const DASHBOARD_SECTION_KEYS = [
+  'dashboard.stats',
+  'dashboard.live',
+  'dashboard.growth',
+  'dashboard.activity',
+  'dashboard.attention',
+  'dashboard.newusers',
+  'dashboard.leaderboard',
+] as const;
+
+/**
+ * Whether a dashboard section should render for this user. Unrestricted by
+ * default: a role that holds NO section keys sees every section (so existing
+ * roles and super-admin are unaffected). Once a role is given at least one
+ * section key, only those sections render.
+ */
+export function canViewDashboardSection(user: PermissionUser, section: string): boolean {
+  const set = userPermissionSet(user);
+  if (set === 'all') return true;
+  const chosen = set.filter((k) => (DASHBOARD_SECTION_KEYS as readonly string[]).includes(k));
+  if (chosen.length === 0) return true;
+  return set.includes(section);
 }
 
 // ── Role colors ─────────────────────────────────────────────────────────────
@@ -177,17 +260,73 @@ export const NAV_PERMISSIONS: Record<string, string[]> = {
   '/admin/requests': ['requests.view'],
   '/admin/bugs': ['bugs.view'],
   '/admin/events': ['events.view'],
+  '/admin/clubs': ['clubs.view'],
+  '/admin/clubs/registrations': ['clubs.view'],
+  '/admin/mail': ['emails.view'],
+  '/admin/mail/automail': ['emails.view'],
+  '/admin/mail/mailbox': ['emails.view'],
+  '/admin/mail/compose': ['emails.view'],
+  '/admin/mail/logs': ['emails.view'],
+  '/admin/mail/notifications': ['emails.view'],
+  '/admin/activity': ['activity.view'],
+  '/admin/marketing': ['marketing.view'],
 };
 
-export const SUPER_ADMIN_ONLY_ROUTES = ['/admin/roles'];
+// Prefix-gated dynamic routes (e.g. /admin/activity/u/:id) — a pathname falls
+// under the first matching prefix.
+export const NAV_PERMISSION_PREFIXES: [string, string[]][] = [
+  ['/admin/activity/u/', ['activity.view']],
+  // A single club's editor lives under /admin/clubs/:clubId — gated on
+  // clubs.view so a read-only role can open the editor and see the
+  // content, with the write actions themselves gated on clubs.manage.
+  ['/admin/clubs/', ['clubs.view']],
+];
+
+export const SUPER_ADMIN_ONLY_ROUTES = ['/admin/roles', '/admin/backup', '/admin/settings'];
 
 export function canAccessAdminRoute(user: PermissionUser, pathname: string): boolean {
   if (SUPER_ADMIN_ONLY_ROUTES.includes(pathname)) {
     return user?.role === 'super-admin';
   }
+  for (const [prefix, required] of NAV_PERMISSION_PREFIXES) {
+    if (pathname === prefix.replace(/\/$/, '') || pathname.startsWith(prefix)) {
+      return hasAnyPermission(user, ...required);
+    }
+  }
   const required = NAV_PERMISSIONS[pathname];
   if (!required) return true; // not a gated route
   return hasAnyPermission(user, ...required);
+}
+
+/**
+ * First admin route the user can actually open — used as the post-login
+ * landing page for staff, so a marketing role lands on /admin/marketing
+ * instead of hitting "Access denied" on the dashboard.
+ */
+export function firstAdminRoute(user: PermissionUser): string {
+  const order = [
+    '/admin/dashboard',
+    '/admin/activity',
+    '/admin/marketing',
+    '/admin/users',
+    '/admin/roles',
+    '/admin/departments',
+    '/admin/branches',
+    '/admin/sessions',
+    '/admin/upload',
+    '/admin/papers',
+    '/admin/syllabus',
+    '/admin/reports',
+    '/admin/requests',
+    '/admin/bugs',
+    '/admin/events',
+    '/admin/clubs',
+    '/admin/mail',
+  ];
+  for (const route of order) {
+    if (canAccessAdminRoute(user, route)) return route;
+  }
+  return '/admin/dashboard';
 }
 
 /**

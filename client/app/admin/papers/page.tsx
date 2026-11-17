@@ -25,9 +25,12 @@ export default function PapersPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
-  // Verify is separate from edit/delete: a custom role may hold one and not the other.
-  const canModify = hasPermission(user, 'papers.delete');
+  // Edit, verify and delete are independent: a role may hold verify without
+  // edit, and deletion is reserved for super-admins (papers.delete is a
+  // system-only permission that can never be granted to anyone else).
+  const canEdit = hasPermission(user, 'papers.edit');
   const canVerify = hasPermission(user, 'papers.verify');
+  const canDelete = user?.role === 'super-admin';
   const [papers, setPapers] = useState<PYQPaper[]>([]);
   const [filteredPapers, setFilteredPapers] = useState<PYQPaper[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,7 +47,7 @@ export default function PapersPage() {
 
   // `silent` keeps the current list mounted while refetching, so the page
   // height doesn't collapse and the user's scroll position survives an edit.
-  const fetchPapers = async (opts?: { page?: number; limit?: number; silent?: boolean }) => {
+  const fetchPapers = async (opts?: { page?: number; limit?: number; silent?: boolean; search?: string }) => {
     try {
       if (!opts?.silent) setLoading(true);
       const params: Record<string, unknown> = {
@@ -54,6 +57,10 @@ export default function PapersPage() {
       // Server-side verification filter so unverified papers from any page are returned
       if (verificationFilter === 'verified') params.verified = 'true';
       else if (verificationFilter === 'unverified') params.verified = 'false';
+      // Server-side search — the real search across all papers (name/code/dept),
+      // not just the current page.
+      const q = opts?.search ?? debouncedQuery;
+      if (q) params.search = q;
       const res = await pyqApi.getAll(params);
       setPapers(res.data || []);
       setFilteredPapers(res.data || []);
@@ -107,19 +114,23 @@ export default function PapersPage() {
     setPage(1);
   }, [query, verificationFilter]);
 
+  // Debounced server-side search — typing settles for 400ms, then refetches
+  // from the backend (which searches across ALL papers, not just this page).
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query.trim()), 400);
+    return () => clearTimeout(t);
+  }, [query]);
+
   // ...but a refetch must not reset the page the user is browsing.
   useEffect(() => {
     setFilteredPapers(filterPapers(query, verificationFilter, papers));
   }, [query, verificationFilter, papers]);
 
   useEffect(() => {
-    fetchPapers({ page, limit: pageSize });
-  }, []);
-
-  useEffect(() => {
     // refetch when page, pageSize, or verification filter changes
-    fetchPapers({ page, limit: pageSize });
-  }, [page, pageSize, verificationFilter]);
+    fetchPapers({ page, limit: pageSize, search: debouncedQuery });
+  }, [page, pageSize, verificationFilter, debouncedQuery]);
 
   const handleVerify = async (id: string) => {
     try {
@@ -158,9 +169,11 @@ export default function PapersPage() {
   };
 
   const handleView = (paper: PYQPaper) => {
-    // Count the view, then open the protected PDF viewer so the admin can review before verifying
+    // Count the view, then open the protected PDF viewer in a new tab so the
+    // admin can review before verifying — the manage-papers list (search +
+    // filters) stays exactly as it was.
     pyqApi.trackView(paper._id).catch(() => {});
-    router.push(`/view/${paper._id}?type=pyq`);
+    window.open(`/view/${paper._id}?type=pyq`, '_blank', 'noopener,noreferrer');
   };
 
   const handleDownload = async (paper: PYQPaper) => {
@@ -238,6 +251,7 @@ export default function PapersPage() {
 
   const getUploadedBy = (paper: PYQPaper) => {
     if (typeof paper.uploadedBy === 'string') return 'Unknown';
+    if (!paper.uploadedBy) return 'Unknown'; // handle null/missing
     return (paper.uploadedBy as User).email;
   };
 
@@ -300,7 +314,7 @@ export default function PapersPage() {
               {canVerify && (
                 <Button size="sm" onClick={handleBulkVerify} disabled={selected.length===0}>Verify Selected</Button>
               )}
-              {canModify && (
+              {canDelete && (
                 <Button size="sm" variant="destructive" onClick={handleBulkDelete} disabled={selected.length===0}>Delete Selected</Button>
               )}
             </div>
@@ -348,19 +362,19 @@ export default function PapersPage() {
                       <Button size="sm" variant="outline" onClick={() => handleDownload(paper)}>
                         Download
                       </Button>
-                      {canModify && (
-                        <>
-                          <Button
-                            size="sm"
-                            className="bg-slate-900 text-white hover:bg-slate-800"
-                            onClick={() => handleEdit(paper)}
-                          >
-                            Edit
-                          </Button>
-                          <Button size="sm" variant="destructive" onClick={() => handleDelete(paper._id)}>
-                            Delete
-                          </Button>
-                        </>
+                      {canEdit && (
+                        <Button
+                          size="sm"
+                          className="bg-slate-900 text-white hover:bg-slate-800"
+                          onClick={() => handleEdit(paper)}
+                        >
+                          Edit
+                        </Button>
+                      )}
+                      {canDelete && (
+                        <Button size="sm" variant="destructive" onClick={() => handleDelete(paper._id)}>
+                          Delete
+                        </Button>
                       )}
                     </div>
                   </div>
