@@ -82,8 +82,12 @@ function ViewPDFContent() {
 
   useEffect(() => {
     const fetchPDF = async () => {
-      // Don't fetch if still checking auth or not logged in
-      if (authLoading || !user) return;
+      // Don't fetch if not logged in. If auth is still revalidating via
+      // /auth/me but a stored token + optimistic user exist, start anyway —
+      // pdfApi sends the stored Bearer token itself and the interceptor's
+      // refresh + retry covers an expired token.
+      if (!user) return;
+      if (authLoading && typeof window !== 'undefined' && !localStorage.getItem('token')) return;
       // Hold the document until the Instagram gate is confirmed.
       if (!unlocked) return;
 

@@ -196,9 +196,11 @@ const makeResponseInterceptor = (client: AxiosInstance) => async (error: any) =>
       original.headers.Authorization = `Bearer ${newToken}`;
       return client.request(original); // retry on the same instance
     }
-    forceLogout();
+    if (!original.skipAuthRedirect) forceLogout();
   } else if (status === 401) {
-    forceLogout();
+    // Requests can opt out with { skipAuthRedirect: true } — background polls
+    // (badges, heartbeats) must not yank the user to /login on a transient blip.
+    if (!original?.skipAuthRedirect) forceLogout();
   }
   return Promise.reject(error);
 };
@@ -853,7 +855,11 @@ export const bugApi = {
 // + bug reports combined) — powers the dot on the profile dropdown.
 export const supportApi = {
   unreadCount: async (): Promise<number> => {
-    const { data } = await apiClient.get<APIResponse<{ unread: number }>>('/paper-requests/unread-count');
+    // skipAuthRedirect: this runs on a 60s poll from the navbar — a transient
+    // failure must never force-logout the user (badge just stays as-is).
+    const { data } = await apiClient.get<APIResponse<{ unread: number }>>('/paper-requests/unread-count', {
+      skipAuthRedirect: true,
+    } as any);
     return data?.data?.unread ?? 0;
   },
 };
@@ -1578,7 +1584,10 @@ export const careerApi = {
   // The signed-in user's own submissions (newest first) — drives the
   // application-status chip in the navbar dropdown.
   getMine: async (): Promise<APIResponse<CareerApplicationStatusSummary[]>> => {
-    const { data } = await apiClient.get<APIResponse<CareerApplicationStatusSummary[]>>('/careers/applications/me');
+    // skipAuthRedirect: navbar chip poll — failures must not force-logout.
+    const { data } = await apiClient.get<APIResponse<CareerApplicationStatusSummary[]>>('/careers/applications/me', {
+      skipAuthRedirect: true,
+    } as any);
     return data;
   },
 };

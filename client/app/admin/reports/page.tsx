@@ -241,7 +241,7 @@ export default function AdminReportsPage() {
                         {getReasonLabel(report.reason)}
                       </span>
                       <span className="text-xs text-gray-400 font-medium">
-                        Reported on {new Date(report.createdAt).toLocaleDateString()} at {new Date(report.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        Reported on {new Date(report.createdAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })} at {new Date(report.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
                       </span>
                     </div>
                     <div>{getStatusBadge(report.status)}</div>

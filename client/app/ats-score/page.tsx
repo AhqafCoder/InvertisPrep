@@ -913,6 +913,7 @@ export default function ATSResumeAnalyserPage() {
                       year: 'numeric',
                       month: 'short',
                       day: 'numeric',
+                      timeZone: 'Asia/Kolkata',
                     })}
                   </p>
                 </div>

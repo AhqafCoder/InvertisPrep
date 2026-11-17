@@ -37,8 +37,9 @@ USAGE:
     # 4) Full campaign (asks for confirmation first unless --yes)
     python3 send_bulk_email.py --yes
 
-Rate: SES grants 14 emails/sec on this account. The default --rate 10 leaves
-headroom; a 3,400-user send then takes ~6 minutes. Keep the Mac awake:
+Rate: SES sending quotas vary per account/region (check the SES console).
+The default --rate 10 is a safe starting point; raise it only if your quota
+allows. Example long-run (keep the machine awake):
     caffeinate -i python3 send_bulk_email.py --yes
 
 Flags:

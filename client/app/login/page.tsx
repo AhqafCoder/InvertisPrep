@@ -709,6 +709,12 @@ export default function LoginPage() {
     <div style={{ marginTop: "0.85rem", fontSize: "0.75rem", color: "#64748b", lineHeight: 1.5, textAlign: "center" }}>
       By proceeding, you agree to creating an account<br />subject to our{" "}
       <Link href="/terms-of-service" style={{ color: "#475569", fontWeight: 500, textDecoration: "underline" }}>Terms of Service</Link> and <Link href="/privacy-policy" style={{ color: "#475569", fontWeight: 500, textDecoration: "underline" }}>Privacy Policy</Link>.
+      <div style={{ marginTop: "0.6rem", fontSize: "0.65rem", color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+        InvertisPrep is a product by{" "}
+        <a href="https://wtfbuilds.com" target="_blank" rel="noopener noreferrer" style={{ color: "#64748b", fontWeight: 600 }}>
+          WTFBuilds
+        </a>
+      </div>
     </div>
   );
 

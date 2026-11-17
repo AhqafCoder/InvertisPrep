@@ -136,9 +136,9 @@ function TxRow({ tx }: { tx: WalletTransaction }) {
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-slate-900">{tx.description}</p>
         <p className="text-xs text-slate-400 mt-0.5">
-          {date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+          {date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })}
           {' · '}
-          {date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+          {date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
         </p>
       </div>
       <div className="text-right shrink-0">
@@ -199,8 +199,12 @@ export default function WalletPage() {
       if (res.success && res.data) {
         setQcoins(res.data.qcoins);
         setFreeLeft(res.data.freeDownloadsLeft);
-        setBalanceLoaded(true);
+      } else {
+        // API responded but no data — fall back to the auth-context snapshot
+        setQcoins(user.qcoins ?? 0);
+        setFreeLeft(user.freeDownloadsLeft ?? 2);
       }
+      setBalanceLoaded(true);
     }).catch(() => {
       // fallback to context values
       setQcoins(user.qcoins ?? 0);

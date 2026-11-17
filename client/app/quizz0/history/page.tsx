@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { SUBJECTS, QuizSubject } from '@/lib/quizTypes';
 import { useAuth } from '@/contexts/AuthContext';
+import { QuizAuthGuard } from '@/components/quiz/QuizAuthGuard';
 
 const QUIZ_SERVER = process.env.NEXT_PUBLIC_QUIZ_SERVER_URL || 'http://localhost:5001';
 
@@ -18,7 +19,7 @@ const quizFetcher = async (url: string) => {
   const res = await fetch(`${QUIZ_SERVER}${url}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error('Failed to fetch');
+  if (!res.ok) throw new Error(`Quiz server error (${res.status})`);
   return res.json();
 };
 
@@ -44,7 +45,7 @@ const SUBJECT_FILTERS = [
   { value: 'dsa', label: '🧮 DSA' },
 ];
 
-export default function HistoryPage() {
+function HistoryContent() {
   const { user } = useAuth();
   const [subjectFilter, setSubjectFilter] = useState('');
   const [page, setPage] = useState(1);
@@ -52,8 +53,9 @@ export default function HistoryPage() {
   const queryParams = new URLSearchParams({ page: String(page), limit: '20' });
   if (subjectFilter) queryParams.set('subject', subjectFilter);
 
-  const { data, isLoading } = useSWR<{ success: boolean; data: { matches: MatchHistoryItem[]; pagination: any } }>(
-    `/api/quiz/history?${queryParams}`,
+  const { data, isLoading, error, mutate } = useSWR<{ success: boolean; data: { matches: MatchHistoryItem[]; pagination: any } }>(
+    // SWR key is null until we have a user — prevents firing with `Bearer null`.
+    user ? `/api/quiz/history?${queryParams}` : null,
     quizFetcher,
     { revalidateOnFocus: false }
   );
@@ -96,7 +98,18 @@ export default function HistoryPage() {
         </div>
 
         {/* Matches List */}
-        {isLoading ? (
+        {error ? (
+          <Card className="p-12 text-center border-0 shadow-sm">
+            <History className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Couldn't load history</h3>
+            <p className="text-gray-500 mb-6">
+              The quiz server didn't respond. Check your connection and try again.
+            </p>
+            <Button onClick={() => mutate()} className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
+              Retry
+            </Button>
+          </Card>
+        ) : isLoading ? (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
               <div key={i} className="h-24 bg-gray-100 rounded-xl animate-pulse" />
@@ -205,5 +218,13 @@ export default function HistoryPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function HistoryPage() {
+  return (
+    <QuizAuthGuard>
+      <HistoryContent />
+    </QuizAuthGuard>
   );
 }
