@@ -1,28 +1,37 @@
-# 🎓 InvertisPrep 
+<div align="center">
 
-> Previous-Year-Question (PYQ) paper management platform for **Invertis University**.
-> Students browse, view, and contribute verified question papers; staff/admins
-> curate and verify content.
+<img src="docs/wtfbuilds-logo.png" alt="WTFBuilds" width="72">
 
+# 🎓 InvertisPrep
 
-A monorepo with a **Next.js** client, **two Express microservices** (main API + PDF
-service) sharing **MongoDB** and **Redis**, and a **Kotlin WebView** Android app that
-wraps the webapp with a Google OAuth deep-link flow.
+**Free previous-year question papers, syllabi, Quizzo and more — built for Invertis University students.**
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Next.js 16](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org)
+[![Express 5](https://img.shields.io/badge/Express-5-green)](https://expressjs.com)
+[![MongoDB](https://img.shields.io/badge/MongoDB-8.x-47A248?logo=mongodb&logoColor=white)](https://mongodb.com)
+[![Redis](https://img.shields.io/badge/Redis-cache%20%2B%20sessions-DC382D?logo=redis&logoColor=white)](https://redis.io)
+[![Node](https://img.shields.io/badge/Node-18%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
+**A product by [WTFBuilds](https://wtfbuilds.com)**
+
+</div>
 
 ---
 
 ## 📑 Table of Contents
 
 - [Overview](#overview)
+- [Features](#features)
 - [Architecture](#architecture)
 - [Tech Stack](#tech-stack)
 - [Monorepo Structure](#monorepo-structure)
-- [Features](#features)
 - [Data Models](#data-models)
 - [API Reference](#api-reference)
 - [Authentication](#authentication)
-- [Caching Strategy (Redis)](#caching-strategy-redis)
-- [PDF Pipeline / Cloudinary Storage](#pdf-pipeline--cloudinary-storage)
+- [Caching Strategy](#caching-strategy)
+- [PDF Pipeline](#pdf-pipeline--cloudinary-storage)
 - [Security](#security)
 - [Environment Variables](#environment-variables)
 - [Local Setup](#local-setup)
@@ -31,7 +40,8 @@ wraps the webapp with a Google OAuth deep-link flow.
 - [Deployment](#deployment)
 - [Android WebView App](#android-webview-app)
 - [Roadmap](#roadmap)
-- [Known Issues & Security Notes](#known-issues--security-notes)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
@@ -40,20 +50,54 @@ wraps the webapp with a Google OAuth deep-link flow.
 InvertisPrep lets students find previous-year question papers organized by
 **department → branch → semester → session → exam type**. Students log in with
 Google; papers uploaded by students must be **verified by staff** before they
-appear publicly. The platform also includes a resume builder, QCoins wallet,
-leaderboard, events, and a content-reporting/moderation workflow.
+appear publicly. Around that core it has grown into a full student platform:
+Quizzo (real-time 1v1 quiz battles), a resume builder with an ATS scorer,
+QCoins wallet, leaderboard, events, clubs, syllabus library, careers board and
+a support/reporting workflow.
 
-The backend is split into two independently scalable services:
+This repo contains the complete stack:
 
-- **Main Server (API Gateway, :5000)** — auth, users, departments, branches,
-  sessions, syllabus, reports, resumes, wallet, bugs, leaderboard, events,
-  sponsors, admin user management.
-- **PDF Service (:5002)** — PYQ CRUD, PDF uploads, watermarking, view/download
-  streaming, Redis-backed PDF cache.
+| Service | Port | Role |
+|---|---|---|
+| **client** (Next.js 16) | 3000 | App Router frontend — server-rendered public pages, admin suite |
+| **server** (Express 5) | 5000 | Main API: auth, users, departments, syllabus, resumes, wallet, events, clubs, careers, mail, activity |
+| **pdf-service** (Express 5) | 5002 | PYQ CRUD, PDF upload, watermarking, view/download streaming |
+| **quiz-server** (Express + Socket.io) | 5001 | Quizzo: matchmaking, live 1v1 quiz engine, history, leaderboard |
 
-Both services share **MongoDB** (data) and **Redis** (sessions, user cache, PDF
-cache, BullMQ job queue) and validate the **same JWT** — the client talks to each
-service directly.
+All services share **MongoDB** and **Redis** and validate the **same JWT** —
+the client talks to each service through same-origin rewrites, so backend URLs
+never reach the browser bundle.
+
+---
+
+## Features
+
+**PYQ core**
+- 🔍 Browse papers by department → branch → semester → session → exam type, with instant client-side search
+- 🔗 Slug URLs (`/pyq/btech`) with ObjectId back-compat
+- ⬆️ Staff upload + student upload (verified before public, 10/day IST cap)
+- ✅ Verification workflow for staff (`student | srt | admin | super-admin` roles)
+- 🖼️ Generic watermarking (render once, cached 24 h in Redis) + protected canvas PDF viewer
+- 📄 Server-rendered listing pages (Next.js ISR) — instant paint, SEO-friendly
+
+**Student platform**
+- 🧠 **Quizzo** — real-time 1v1 quiz matches, matchmaking queue, rooms, weekly leaderboard
+- 📝 **Resume builder** — ATS score analyzer, templates, PDF export, guest-mode with migration on login
+- 🪙 **QCoins wallet** — Razorpay top-ups, free downloads, full transaction log
+- 🏆 Leaderboard (all-time + weekly, department filter)
+- 🎉 **Events** — admin-authored pages with rich HTML content, registration links, drafts
+- 🏫 **Clubs** — seeded directory with detail pages and RSVP
+- 📚 **Syllabus library** — department-wise PDF downloads
+- 💼 **Careers board** — applications with status tracking
+- 📨 **Paper requests & bug reports** — with reply notifications
+- 👥 Social graph — follow/unfollow, public profiles
+
+**Admin suite** (role-gated)
+- 📊 Dashboard with live activity monitoring + growth analytics (drill-down to real users)
+- 📬 **Mail Center** — automail, IMAP mailbox, compose, logs, editable email templates (SES-powered)
+- 👤 User & role management with custom roles + fine-grained permissions
+- 🗃️ Database backup/restore (EJSON gzip export, chunked import)
+- 🛡️ Content moderation — reports, bugs, paper verification queues
 
 ---
 
@@ -61,61 +105,53 @@ service directly.
 
 ```
                         ┌──────────────────────────────┐
-                        │      CLIENT (Next.js)        │
-                        │  invertisprepv2.vercel.app   │
+                        │      CLIENT (Next.js 16)     │
+                        │  SSR/ISR public pages + SPA  │
+                        │  same-origin /backend /pdfapi│
                         └──────┬───────────────┬───────┘
                Bearer JWT      │               │      Bearer JWT
                               ▼               ▼
         ┌──────────────────────────┐   ┌──────────────────────────┐
         │   MAIN SERVER  (:5000)   │   │   PDF SERVICE  (:5002)   │
         │  Auth · Users · Depts    │   │  PYQ CRUD · Uploads      │
-        │  Branches · Sessions     │   │  Watermark · View/DL     │
-        │  Syllabus · Reports      │   │  Redis PDF cache         │
-        │  Resumes · Wallet        │   │  BullMQ watermark jobs   │
-        │  Bugs · Leaderboard      │   │  (/api/pyq, /api/pdf)    │
-        │  Events · Sponsors       │   └─────┬──────────┬─────────┘
-        │  Admin users             │         │          │
-        └─────┬────────┬───────────┘         │          │
-              │        │                     │          │
-              │        │   /api/auth/internal/user/:id   │
-              │        └─────────────────────►│ (fallback user lookup,   │
-              │           X-Service-Token     │  X-Service-Token guarded) │
-              ▼                              ▼          ▼
-      ┌──────────────────────────────────────────┐  ┌──────────────┐
-      │        MongoDB (shared database)         │  │   Cloudinary │
-      │  users · pyqpapers · departments · …     │  │  (raw PDFs)  │
-      └──────────────────────────────────────────┘  └──────────────┘
+        │  Syllabus · Resumes      │   │  Watermark · View/DL     │
+        │  Wallet · Events · Clubs │   │  Redis PDF cache         │
+        │  Careers · Mail · Admin  │   │  BullMQ watermark jobs   │
+        └─────┬────────┬───────────┘   └────────┬─────────────────┘
+              │        │                        │
+              │        │  /api/auth/internal    │
+              │        └───────────►│ (X-Service-Token guarded)
+              ▼                     ▼          ▼
+      ┌──────────────────────────────────────┐  ┌──────────────┐
+      │        MongoDB (shared database)     │  │   Cloudinary │
+      │  users · pyqpapers · departments · … │  │  (raw PDFs)  │
+      └──────────────────────────────────────┘  └──────────────┘
                               ▲
                               │
       ┌───────────────────────┴──────────────────┐
       │              Redis (shared)              │
-      │  session:{userId}     refresh tokens     │
-      │  user:{userId}        profile cache 5min │
-      │  pdf:watermarked:{id} PDF cache 24h      │
-      │  BullMQ queue         watermark jobs     │
+      │  sessions · user cache · PDF cache       │
+      │  BullMQ queue (watermark jobs)           │
       └──────────────────────────────────────────┘
+
+        ┌──────────────────────────────────────────┐
+        │        QUIZ SERVER (:5001, Socket.io)    │
+        │  matchmaking · 1v1 engine · history      │
+        │  shares MongoDB + JWT with the stack     │
+        └──────────────────────────────────────────┘
 ```
-
-### Service boundaries
-
-| Service | Port | Responsibilities | Scales independently |
-|---|---|---|---|
-| **Main Server** | 5000 | Auth (login/refresh/logout), users, departments, branches, sessions, syllabus, reports, resumes, wallet, bugs, leaderboard, events, sponsors, admin | ✅ |
-| **PDF Service** | 5002 | PYQ CRUD, PDF upload, generic watermarking, view/download, PDF cache | ✅ |
-| **Redis** | 6379 | Session store, user profile cache, watermarked-PDF cache, BullMQ queue | ✅ |
-| **MongoDB** | — | Shared database (both services connect to the same cluster) | ✅ |
 
 ### Why the split
 
 | Before (monolith) | After |
 |---|---|
-| User-specific watermarks (email + timestamp) → re-render per user, high CPU | One generic watermark per paper → render once, cache in Redis |
+| User-specific watermarks → re-render per user, high CPU | One generic watermark per paper → render once, cache in Redis |
 | Client → main server → PDF proxy hop | Client calls the PDF service directly |
 | DB lookup on every authenticated request | Redis-cached user profiles (5-min TTL) |
-| PDF bytes cached in per-process LRU only | Shared Redis cache by `paperId` (24-h TTL) — survives restarts, shared across instances |
+| PDF bytes cached in per-process LRU only | Shared Redis cache by `paperId` (24-h TTL) |
 
-Measured locally: **cold PDF view ~860ms** (Cloudinary fetch + watermark + cache write),
-**cached view ~47ms** (≈18× faster).
+Measured locally: **cold PDF view ~860 ms** (Cloudinary fetch + watermark + cache
+write), **cached view ~47 ms** (≈18× faster).
 
 ---
 
@@ -124,12 +160,11 @@ Measured locally: **cold PDF view ~860ms** (Cloudinary fetch + watermark + cache
 ### Client (`/client`)
 | Layer | Technology |
 |---|---|
-| Framework | **Next.js 16** (App Router, Turbopack) |
-| UI | **React 19**, **Tailwind CSS v4**, **shadcn/ui** (Radix primitives), `lucide-react` |
-| PDF Viewer | **react-pdf v10** (`pdfjs-dist`) — canvas rendering, page nav, zoom |
-| Auth | **next-auth v4** (Google OAuth handshake) + app JWT in `localStorage` + httpOnly refresh cookie |
-| HTTP | **axios** — two instances (main + PDF service) with shared auth interceptor & auto token-refresh |
-| State | React Context (`AuthContext`) |
+| Framework | **Next.js 16** (App Router, Turbopack, ISR on public pages) |
+| UI | **React 19**, **Tailwind CSS v4**, **shadcn/ui** (Radix primitives), `framer-motion`, `lucide-react` |
+| PDF Viewer | **react-pdf v10** (`pdfjs-dist`) — canvas rendering, screenshot guard |
+| Auth | **next-auth v4** (Google handshake) + app JWT in `localStorage` + httpOnly refresh cookie |
+| HTTP | **axios** — dual instances (main + PDF) with auto token-refresh interceptor; **SWR** on client-cached pages |
 | Language | **TypeScript** |
 
 ### Main Server (`/server`)
@@ -139,28 +174,28 @@ Measured locally: **cold PDF view ~860ms** (Cloudinary fetch + watermark + cache
 | Framework | **Express 5** |
 | Database | **MongoDB** via **Mongoose 8** |
 | Auth | **jsonwebtoken** (15-min access / 7–30-day refresh), **bcryptjs**, **google-auth-library** |
-| Cache/Sessions | **Redis** (vendored `src/shared/redisClient.js`) |
-| File storage | **Cloudinary** (syllabus PDFs) + **multer** |
-| Security | `helmet`, `cors` (prod-aware), tiered `express-rate-limit`, `cookie-parser` |
+| Email | **Amazon SES** (SMTP), IMAP inbox sync, templated automail |
+| Payments | **Razorpay** (QCoins top-ups, webhook signature verification) |
+| Security | `helmet`, tiered `express-rate-limit`, prod-aware CORS |
 
 ### PDF Service (`/pdf-service`)
 | Layer | Technology |
 |---|---|
-| Runtime | **Node.js** (ESM) |
 | Framework | **Express 5** |
-| Database | **MongoDB** (shared cluster; `pyqpapers`, lookup models for populate) |
 | PDF processing | **pdf-lib** (generic gradient watermark + branded footer) |
-| Cache/Queue | **Redis** (PDF cache via vendored `src/shared/redisClient.js`) + **BullMQ** (watermark jobs) |
-| File storage | **Cloudinary** (raw PDF uploads) + **multer** |
-| Config | **zod** env schema validation |
-| Security | `helmet`, `cors` (prod-aware), tiered `express-rate-limit` |
+| Cache/Queue | **Redis** (PDF cache) + **BullMQ** (watermark jobs) |
+| Config | **zod** env validation |
 
-### Shared Redis client (vendored per service)
-`src/shared/redisClient.js` — identical copies in both services (`server/src/shared/`
-and `pdf-service/src/shared/`). A single Redis client (reconnect strategy, lazy
-connect) with no cross-package dependency, so **each service deploys as a fully
-self-contained unit** (Root Directory = `server` / `pdf-service` on Render — no
-monorepo tooling needed). If you change one copy, change both.
+### Quiz Server (`/quiz-server`)
+| Layer | Technology |
+|---|---|
+| Framework | **Express 5** + **Socket.io 4** |
+| Engine | Room + auto matchmaking, live 1v1 quiz engine, MongoDB persistence |
+| Auth | Same JWT as the stack (local verify + shared Redis cache) |
+
+The Redis client is **vendored per service** (`src/shared/redisClient.js`) so
+each service deploys as a fully self-contained unit — no cross-package
+dependencies, no monorepo tooling needed. If you change one copy, change both.
 
 ---
 
@@ -168,80 +203,43 @@ monorepo tooling needed). If you change one copy, change both.
 
 ```
 InvertisPrep/
-├── client/                      # Next.js frontend
+├── client/                      # Next.js 16 frontend (:3000)
 │   ├── app/
-│   │   ├── login/               # Google OAuth + admin password + WebView flow
-│   │   ├── pyq/                 # /pyq (departments) → /pyq/[departmentId] (slug URLs)
-│   │   │   └── upload/          # student uploads
-│   │   ├── view/[id]/           # protected PDF viewer (watermarked)
-│   │   ├── resources/syllabus/  # syllabus PDFs
-│   │   ├── admin/               # dashboard, papers, syllabus, reports, users, …
-│   │   ├── profile/[userId]/    # public profiles
-│   │   └── wallet/ resumes/ leaderboard/ events/ sponsor/ …
-│   ├── components/              # Navbar, PDFViewer, layout/*, ui/* (shadcn)
-│   ├── contexts/AuthContext.tsx
-│   ├── lib/api.ts               # dual axios clients + auto token refresh
-│   └── types/index.ts
+│   │   ├── pyq/                 # /pyq (departments) → /pyq/[departmentId] — SSR'd
+│   │   ├── view/[id]/           # protected watermarked PDF viewer
+│   │   ├── events/ club/ careers/ resources/syllabus/
+│   │   ├── quizz0/              # Quizzo UI (play, rooms, history, leaderboard)
+│   │   ├── admin/               # dashboard, papers, users, mail, activity, backup…
+│   │   ├── wallet/ resumes/ leaderboard/ profile/
+│   │   └── api/                 # Next route handlers (NextAuth, ATS proxy)
+│   ├── components/              # Navbar, PDFViewer, brand/, ui/* (shadcn)
+│   ├── contexts/                # AuthContext, QuizSocketContext
+│   ├── hooks/ lib/ types/
+│   └── next.config.ts           # rewrites (/backend, /pdfapi), security headers
 │
 ├── server/                      # Main API service (:5000)
-│   └── src/
-│       ├── server.js            # bootstrap, CORS, rate-limit tiers, route mounts
-│       ├── config/              # database.js, cloudinary.js
-│       ├── models/              # User, PYQPaper (→ pyqpapers), Department, Branch,
-│       │                        # Session, Report, Syllabus, Resume, Transaction, …
-│       ├── controllers/         # auth, users, departments, reports, wallet, …
-│       ├── routes/              # auth, departments, pdf (syllabus view), pdfProxy, …
-│       ├── services/            # authService (Redis sessions), googleAuthService
-│       ├── middleware/          # auth (JWT + roles), upload, rateLimit, errorHandler
-│       └── utils/               # seedSuperAdmin, cache, points, badges
+│   ├── src/
+│   │   ├── server.js            # bootstrap, CORS, rate-limit tiers, route mounts
+│   │   ├── models/ controllers/ routes/ services/ middleware/ utils/
+│   │   └── shared/redisClient.js
+│   └── scripts/                 # operational scripts (see Testing section)
 │
 ├── pdf-service/                 # PDF/PYQ microservice (:5002)
-│   └── src/
-│       ├── server.js            # bootstrap + model registration for populate()
-│       ├── config/              # database, cloudinary, env (zod-validated)
-│       ├── models/              # PDFDocument (→ pyqpapers), User, Department,
-│       │                        # Branch, Session (lookup mirrors), WatermarkJob
-│       ├── controllers/         # pyqController, pdfController, upload, jobs
-│       ├── routes/              # pyq, pdf, upload, jobs, health
-│       ├── services/            # pdfProcessor (watermark), cloudinary, queue (BullMQ)
-│       ├── middleware/          # auth (Redis cache + main-server fallback), upload, rateLimit
-│       └── utils/               # redisCache (PDF cache), filename
+│   └── src/                     # server, models, controllers, services (watermark), utils
 │
-
-
-
+├── quiz-server/                 # Quizzo realtime server (:5001)
+│   ├── src/server.js            # Express + Socket.io bootstrap
+│   ├── src/socket/              # matchmaking + quiz engine
+│   └── src/seed/seedQuestions.js
 │
-├── start-all.sh                 # boots Redis + main + pdf-service + client together
-├── IMPLEMENTATION_PLAN.md       # migration plan & status (all phases ✅)
-├── IMPROVED_ARCHITECTURE.md     # architecture design document
-└── README.md                    # this file
+├── scripts/generate-club-seed.mjs   # regenerates server club seed from client clubs.ts
+├── docs/                            # brand assets used by this README
+├── start-all.sh                     # boots Redis + main + pdf-service + client
+└── README.md
 ```
 
-> The Kotlin Android app lives in a **separate repo**. See [Android WebView App](#android-webview-app).
-
----
-
-## Features
-
-### ✅ Implemented
-- **Google OAuth login** for students (auto-creates account) + **email/password** for admins.
-- **Short-lived access tokens (15 min) + refresh tokens (7 d / 30 d "remember me")** in an httpOnly cookie, with silent client-side refresh — users stay logged in seamlessly.
-- **Role-based access**: `student` | `srt` | `admin` | `super-admin`.
-- **PYQ browsing** by department → branch → semester → session → exam type, with search.
-- **Slug URLs** — `/pyq/btech`, `/pyq/bca` (ObjectIds still resolve for old links).
-- **Admin/staff upload** and **student upload** (verified before public, 10/day IST).
-- **Verification workflow** — staff (admin/super-admin/srt) verify student uploads.
-- **Generic watermarking** — one big diagonal `INVERTISPREP` gradient stamp + branded footer on every page; rendered once per paper and cached in Redis for 24 h.
-- **Syllabus PDFs** browsable by department/year.
-- **Protected in-app PDF viewer** (`react-pdf`, canvas rendering — works in Android WebView).
-- **Social graph** — follow/unfollow, public profiles with last verified papers.
-- **Reporting & moderation**, **view/download analytics**, **soft deletes**.
-- **Resume builder** with QCoins wallet (free downloads + top-up packs, transaction log).
-- **Leaderboard** (all-time + weekly, department filter), **events**, **sponsors**, **bug reporting**.
-- **Admin user management** — role/status updates with Redis cache invalidation.
-
-### 🚧 Coming Soon
-- **Quizzo** — quiz platform (`/quizz0` placeholder).
+> The Kotlin Android WebView app lives in a **separate repo** — see
+> [Android WebView App](#android-webview-app).
 
 ---
 
@@ -253,30 +251,29 @@ Both services read/write the **same MongoDB collections**. The PYQ entity is
 
 ### User (`users`)
 `googleId` · `email` (unique) · `password` (select:false) · `name` · `picture` ·
-`studentId` · `phoneNumber` · `course` · `followers[]` · `following[]` · `role`
-(`student|srt|admin|super-admin`) · `lastLogin` · `isActive` · `qcoins` ·
+`studentId` · `course` · `followers[]` · `following[]` · `role`
+(`student|srt|admin|super-admin` + custom roles) · `isActive` · `qcoins` ·
 `freeDownloadsLeft` · `points` · `weeklyPoints`
 
 ### PYQ paper (`pyqpapers`)
 `title` (auto: `subjectName examType year`) · `subjectCode` · `subjectName` ·
-`departmentId` · `branchId` · `semester` (1–10) · `sessionId` · `examType`
-(`mid-term|end-term`) · `cloudinaryUrl` · `cloudinaryPublicId` · `fileName` ·
-`fileSize` · `year` · `uploadedBy` · `views` · `downloads` · `verified` · `isActive`
+`departmentId` · `branchId` · `additionalBranchIds[]` · `semester` (1–10) ·
+`sessionId` · `examType` (`mid-term|end-term`) · `cloudinaryUrl` ·
+`cloudinaryPublicId` · `fileSize` · `year` · `uploadedBy` · `views` ·
+`downloads` · `verified` · `isActive`
 
-> `cloudinaryUrl` is excluded from public listing responses. PDFs are served only
-> through the authenticated, watermarked view/download endpoints.
+> `cloudinaryUrl` is excluded from public listing responses. PDFs are served
+> only through the authenticated, watermarked view/download endpoints.
 
 ### Department (`departments`)
-`id` (unique slug, e.g. `btech`) · `name` · `displayName` · `icon` · `description` · `isActive`
-— public endpoints resolve **ObjectId or slug**.
-
-### Branch (`branches`) / Session (`sessions`)
-Branch: `id` (slug) · `name` · `departmentId` · `semsters[]` · `isActive`.
-Session (academic): `id` · `name` · `startYear` · `endYear` · `isActive`.
+`id` (unique slug, e.g. `btech`) · `name` · `displayName` · `icon` ·
+`description` · `isActive` — public endpoints resolve **ObjectId or slug**.
 
 ### Others
-`reports` (paperId + reportedBy unique) · `syllabuses` · `resumes` ·
-`transactions` · `pointslogs` · `bugs` · `events` · `sponsors` · `watermarkjobs`
+`branches` · `sessions` · `syllabuses` · `resumes` · `transactions` · `pointslogs`
+· `bugs` · `events` · `clubs` · `clubregistrations` · `careers` · `careerapplications`
+· `paperrequests` · `reports` · `questions` · `quizmatches` · `activitylogs` ·
+`presences` · `watermarkjobs`
 
 ---
 
@@ -284,7 +281,7 @@ Session (academic): `id` · `name` · `startYear` · `endYear` · `isActive`.
 
 Auth legend: 🔓 public · 🔑 JWT required · 🎫 staff (admin/super-admin/srt) · 👑 admin · 👑👑 super-admin.
 
-### Main Server — `http://…:5000/api`
+### Main Server — `:5000/api`
 
 #### Auth — `/api/auth` (rate-limited, brute-force protected)
 | Method | Path | Auth | Description |
@@ -295,46 +292,46 @@ Auth legend: 🔓 public · 🔑 JWT required · 🎫 staff (admin/super-admin/s
 | POST | `/auth/logout` | 🔓 | Revoke Redis session + clear cookie |
 | GET | `/auth/me` | 🔑 | Current user |
 | PUT | `/auth/profile` | 🔑 | Update profile |
-| GET | `/auth/internal/user/:userId` | 🔧 | Service-to-service only — `X-Service-Token` (timing-safe compare) |
+| GET | `/auth/internal/user/:userId` | 🔧 | Service-to-service only — `X-Service-Token` (timing-safe) |
 
-#### Other resources
+#### Resources
 | Resource | Notes |
 |---|---|
-| `/api/departments` | list 🔓 · `/:id` by **ObjectId or slug** 🔓 · CRUD 👑 |
-| `/api/departments/:id/branches` | branches by ObjectId **or slug** 🔓 |
-| `/api/branches`, `/api/sessions` | CRUD 👑 |
+| `/api/departments` | list 🔓 · `/:id` by **ObjectId or slug** 🔓 · branches 🔓 · CRUD 👑 |
 | `/api/syllabus` | list 🔓 · upload 🎫 · delete 👑 |
-| `/api/pdf/view/:id?type=syllabus` | watermarked syllabus 🔑 (syllabus stays on main server) |
 | `/api/users/:id`, follow/unfollow | 🔑 |
-| `/api/reports` | create 🔑 · triage 👑 |
-| `/api/resumes`, `/api/wallet` | 🔑 (QCoins, packs, transactions) |
+| `/api/resumes`, `/api/wallet` | 🔑 (QCoins, Razorpay top-ups, transactions) |
 | `/api/leaderboard` | 🔓 rankings + 🔑 my-stats |
-| `/api/events`, `/api/sponsors`, `/api/bugs` | site content + bug reporting |
-| `/api/admin/users` | list/stats/role/status 👑 (invalidates Redis user cache) |
+| `/api/events`, `/api/clubs` | site content — CRUD 👑 |
+| `/api/careers`, `/api/sponsors` | board + applications |
+| `/api/paper-requests`, `/api/bugs`, `/api/reports` | student requests & moderation |
+| `/api/settings` | public platform settings (gates, toggles) |
+| `/api/admin/*` | users, roles, mail, activity, marketing, backup — 👑👑 |
 | `/health` | 🔓 liveness |
 
-### PDF Service — `http://…:5002/api`
-
-#### PYQ — `/api/pyq`
+### PDF Service — `:5002/api`
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| GET | `/pyq` | 🔓 | Public list (`verified:true, isActive:true`) with filters (operator-injection-safe) |
-| GET | `/pyq/upload-count` | 🔑 | Today's upload count vs 10/day IST |
+| GET | `/pyq` | 🔓 | Public list (`verified:true, isActive:true`) with operator-injection-safe filters |
 | POST | `/pyq/upload` | 🎫 | Staff upload |
-| POST | `/pyq/upload-public` | 🔑 | Student upload |
-| GET | `/pyq/all` | 🎫 | Paginated staff list |
-| POST | `/pyq/:id/view`, `/pyq/:id/download` | 🔑 | Counters |
+| POST | `/pyq/upload-public` | 🔑 | Student upload (10/day IST) |
 | PATCH | `/pyq/:id/verify` | 🎫 | Verify paper |
 | PUT / DELETE | `/pyq/:id` | 👑 | Update metadata / soft-delete + Cloudinary cleanup |
+| GET | `/pdf/view/:id?type=pyq\|syllabus` | 🔑 | Inline watermarked PDF (Redis-cached) |
+| GET | `/pdf/download/:id` | 🔑 | Attachment with branded RFC-5987 filename |
+| GET | `/health` | 🔓 | DB + queue + memory status |
 
-#### PDF — `/api/pdf` (pdfLimiter + JWT)
-| Method | Path | Description |
-|---|---|---|
-| GET | `/pdf/view/:id?type=pyq` | Inline watermarked PDF (Redis-cached) |
-| GET | `/pdf/download/:id?type=pyq` | Attachment with branded RFC-5987 filename |
+### Quiz Server — `:5001/api/quiz`
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/leaderboard` | 🔓 | All-time + weekly rankings |
+| GET | `/history` | 🔑 | Player's match history (paginated) |
+| GET | `/match/:id` | 🔑 | Match result detail |
+| GET | `/stats` | 🔑 | Personal stats |
+| POST/DELETE | `/questions` | 🔑 | Question bank management |
 
-Also: `/api/upload` (BullMQ job-based uploads), `/api/jobs/:id` (job status),
-`/api/health` (DB + queue + memory status).
+Live gameplay runs over **Socket.io** (`quiz:join_queue`, `quiz:submit_answer`,
+…) — see `quiz-server/src/socket/`.
 
 ---
 
@@ -347,47 +344,39 @@ Also: `/api/upload` (BullMQ job-based uploads), `/api/jobs/:id` (job status),
 | Refresh token (JWT, `type:refresh`) | **7 days** (30 with "remember me") | httpOnly `refreshToken` cookie + Redis session hash |
 
 ### Flows
-- **Login (Google or password)** → `authService.login()` signs both tokens, stores
-  `session:{userId}` in Redis (refresh token + UA + IP), caches `user:{userId}` (5-min TTL).
-- **Every authenticated request** → JWT verified → user loaded from the **Redis cache**
-  (zero DB queries in steady state; DB fallback repopulates the cache).
-- **Token expiry** → client interceptor catches the 401, calls `/auth/refresh` **once**
-  (shared promise — concurrent 401s queue), stores the new access token, and retries
-  the original request. Users never see a re-login until the refresh cookie itself expires.
-- **Logout** → Redis session + user cache deleted; cookie cleared.
-- **Role/status change (admin)** → `User` post-save hook invalidates `user:{id}` so
-  revoked roles take effect within seconds.
+- **Login (Google or password)** → both tokens signed, `session:{userId}` stored
+  in Redis, `user:{userId}` cached (5-min TTL).
+- **Every authenticated request** → JWT verified → user loaded from the **Redis
+  cache** (zero DB queries in steady state; DB fallback repopulates the cache).
+- **Token expiry** → client interceptor catches the 401, calls `/auth/refresh`
+  **once** (shared promise — concurrent 401s queue), stores the new token, and
+  retries. Users never see a re-login until the refresh cookie itself expires.
+- **Background polls** (navbar badges) opt out of forced logout via a
+  `skipAuthRedirect` flag — a transient blip never yanks the user to `/login`.
+- **Role/status change (admin)** → `User` post-save hook invalidates `user:{id}`
+  so revoked roles take effect within seconds.
 
 ### Cross-service validation
-The PDF service verifies the **same JWT** (shared `JWT_SECRET`), checks the shared
-Redis user cache first, and falls back to the main server's internal endpoint
-(`/api/auth/internal/user/:id`) guarded by `INTERNAL_SERVICE_TOKEN`
-(timing-safe comparison) — caching the result back into Redis.
-
-### Role guards (both services)
-`authenticateJWT` → `isStaff` (admin/super-admin/srt — upload & verify) →
-`isAdmin` (admin/super-admin — edit & delete) → `isSuperAdmin`.
-
-### Super-admin bootstrap
-`npm run seed` in `server/` creates `superadmin@invertis.edu.in` / `super123`.
-**Change this password in production.**
+All services verify the **same JWT** (shared `JWT_SECRET`), check the shared
+Redis user cache first, and fall back to the main server's internal endpoint
+guarded by `INTERNAL_SERVICE_TOKEN` (timing-safe comparison).
 
 ---
 
-## Caching Strategy (Redis)
+## Caching Strategy
 
-| Key pattern | TTL | Purpose |
-|---|---|---|
-| `session:{userId}` | 7–30 d (matches refresh token) | Refresh-token validation, UA/IP metadata |
-| `user:{userId}` | 5 min | Auth middleware user profile — zero DB auth queries |
-| `pdf:watermarked:{paperId}` | 24 h | Rendered watermarked PDF (base64) — shared across users/instances |
-| BullMQ streams | — | Async watermark job queue |
+| Layer | Key/Window | TTL | Purpose |
+|---|---|---|---|
+| Redis | `session:{userId}` | 7–30 d | Refresh-token validation, UA/IP metadata |
+| Redis | `user:{userId}` | 5 min | Auth middleware profile cache — zero DB auth queries |
+| Redis | `pdf:watermarked:{paperId}` | 24 h | Rendered watermarked PDF — shared across users/instances |
+| Redis | BullMQ streams | — | Async watermark job queue |
+| Next.js | ISR data cache | 60 s–1 h | Public page payloads (`/pyq`, `/events`, clubs, syllabus) — **one** upstream request per window regardless of traffic |
 
-- Fail-open design: if Redis is unavailable, auth falls back to DB and PDFs
+- **Fail-open design**: if Redis is unavailable, auth falls back to DB and PDFs
   regenerate — the site degrades gracefully instead of erroring.
-- Vendored Redis client in each service's `src/shared/redisClient.js` (reconnect strategy, lazy connect).
-- PDF cache is keyed by **paper id only** (watermarks are generic), which is what
-  makes the 24-h shared cache possible.
+- Rate limiting is currently **in-memory per instance** — use a Redis store
+  before horizontal scaling.
 
 ---
 
@@ -396,7 +385,7 @@ Redis user cache first, and falls back to the main server's internal endpoint
 Papers live in **Cloudinary** as `raw` resources and are never served directly.
 
 ```
-Client ── GET /api/pdf/view/:id (Bearer JWT) ──► PDF Service
+Client ── GET /pdfapi/pdf/view/:id (Bearer JWT) ──► PDF Service
    1. authenticateJWT (Redis-cached user)
    2. lookup paper (pyqpapers) — invalid ids → clean 404
    3. Redis: pdf:watermarked:{id} ── hit ──► stream (≈47ms)
@@ -404,31 +393,22 @@ Client ── GET /api/pdf/view/:id (Bearer JWT) ──► PDF Service
 ```
 
 ### Watermark (generic, cache-friendly)
-- **One big diagonal `INVERTISPREP`** per page — 68pt, −35°, 12% opacity,
+- **One big diagonal `INVERTISPREP`** per page — 68 pt, −35°, 12 % opacity,
   per-character indigo→purple→pink gradient.
-- **Branded footer** — "PYQs available for free on www.invertisprep.in" (centered).
-- **No user email/timestamp** — the output is identical for every viewer, so one
-  render per paper serves everyone (that's what makes the shared cache valid).
-
-### Upload flow
-Multer (PDF-only, size-capped) → temp file → Cloudinary `resource_type: 'raw'` →
-metadata stored in `pyqpapers` → temp file deleted. Staff uploads land directly;
-student uploads require verification.
-
-### Syllabus vs PYQ routing (client)
-`pdfApi.view/download(id, type)` routes **`type=pyq` → PDF service (:5002)** and
-**`type=syllabus` → main server (:5000)**, which owns the `syllabuses` collection.
+- **Branded footer** — "PYQs available for free on www.invertisprep.in".
+- **No user email/timestamp** — the output is identical for every viewer, which
+  is what makes the shared 24-h cache valid.
 
 ### Key files
 | File | Purpose |
 |---|---|
-| `pdf-service/src/services/pdfProcessor.js` | Generic watermark + footer + Redis cache integration |
-| `pdf-service/src/utils/redisCache.js` | `pdf:watermarked:*` get/set/invalidate/clear |
-| `pdf-service/src/controllers/pdfController.js` | view/download handlers (ObjectId-validated) |
-| `pdf-service/src/controllers/pyqController.js` | Full PYQ CRUD + verification |
-| `server/src/services/authService.js` | Tokens, Redis sessions, cache, refresh, revoke |
-| `client/lib/api.ts` | Dual axios clients, auto-refresh interceptor, syllabus/pyq routing |
-| `client/components/PDFViewer.tsx` | Canvas PDF viewer (react-pdf) |
+| `pdf-service/src/services/pdfProcessor.js` | Watermark + footer + Redis cache |
+| `pdf-service/src/utils/redisCache.js` | `pdf:watermarked:*` get/set/invalidate |
+| `pdf-service/src/controllers/pdfController.js` | View/download handlers |
+| `server/src/services/authService.js` | Tokens, Redis sessions, refresh, revoke |
+| `client/lib/api.ts` | Dual axios clients, auto-refresh interceptor, `skipAuthRedirect` |
+| `client/components/PDFViewer.tsx` | Canvas viewer + screenshot guard |
+| `client/components/devtools-guard.tsx` | Global inspect/context-menu deterrence |
 
 ---
 
@@ -436,61 +416,74 @@ student uploads require verification.
 
 | Control | Status |
 |---|---|
-| Helmet security headers (both services) | ✅ |
-| Tiered rate limiting (API / auth brute-force / read / write / upload / PDF) | ✅ |
-| NoSQL operator-injection guards (login + PYQ filters coerce params to strings) | ✅ |
+| Helmet security headers (all three API services) | ✅ |
+| Tiered rate limiting — API / auth / read / write / upload / PDF / quiz | ✅ |
+| NoSQL operator-injection guards (login + PYQ filters) | ✅ |
 | Timing-safe service-token comparison | ✅ |
-| CORS: localhost origins dev-only; prod allow-list + `CORS_ORIGINS` | ✅ |
+| CORS: dev-only localhost + prod allow-list | ✅ |
 | httpOnly + SameSite=Lax + Secure-in-prod refresh cookie | ✅ |
-| Redis-backed session revocation (logout/deactivation effective immediately) | ✅ |
-| Zod env validation (pdf-service) | ✅ |
-| Secrets gitignored; `.env` untracked; `.env.example` placeholders only | ✅ |
-| Upload validation (PDF mime + size cap) | ✅ |
+| Redis-backed session revocation (effective immediately) | ✅ |
+| Next.js hardening — `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`, `poweredByHeader` off, `console.*` stripped from prod bundle | ✅ |
+| Browser source maps disabled in production (Next default, kept off) | ✅ |
+| Client-side inspect deterrence (F12/shortcuts/context menu) | ✅ deterrence only |
+| Secrets gitignored; `.env.example` files carry placeholders only | ✅ |
 
-> ⚠️ **If this repo's history contains real secrets, rotate them** (MongoDB,
-> Cloudinary, Google OAuth, `JWT_SECRET`, `INTERNAL_SERVICE_TOKEN`). Removing a
-> file from git does not purge history. Generate secrets with `openssl rand -hex 32`.
+> **Honesty note:** client-side guards (devtools blocking, screenshot shields,
+> watermarks) are **deterrence, not DRM** — determined users can bypass them.
+> Real protection lives server-side: authenticated endpoints, redacted listings
+> (`cloudinaryUrl` never public), watermarked delivery and audit logs.
 
 ---
 
 ## Environment Variables
 
+All `.env.example` files carry placeholders — copy them and fill in real values.
+Never commit real secrets.
+
 ### Main Server (`server/.env`)
 | Key | Purpose |
 |---|---|
 | `PORT` | 5000 |
-| `NODE_ENV` | `production` disables dev error details, enables secure cookies + prod CORS |
+| `NODE_ENV` | `production` → secure cookies, prod CORS, lean errors |
 | `MONGODB_URI` | Shared MongoDB connection string |
 | `REDIS_URL` | e.g. `redis://localhost:6379` |
-| `JWT_SECRET` | Shared with pdf-service (32+ random bytes) |
-| `INTERNAL_SERVICE_TOKEN` | Shared with pdf-service — guards the internal user endpoint |
+| `JWT_SECRET` | Shared with pdf-service + quiz-server (32+ random bytes) |
+| `INTERNAL_SERVICE_TOKEN` | Shared — guards the internal user endpoint |
 | `CLOUDINARY_*` | Syllabus uploads |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google login verification |
-| `CORS_ORIGINS` | Extra allowed origins (comma-separated) |
-| `TRUST_PROXY`, `BODY_LIMIT`, `*_RATE_LIMIT_*`, `MAX_PDF_SIZE_MB` | Tuning knobs |
+| `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` / `RAZORPAY_WEBHOOK_SECRET` | QCoins top-ups |
+| `SES_*` / `IMAP_*` / `SMTP_*` | Mail Center (send + inbox pull) |
+| `CORS_ORIGINS`, `TRUST_PROXY`, `BODY_LIMIT`, `*_RATE_LIMIT_*` | Tuning knobs |
 
 ### PDF Service (`pdf-service/.env`)
-Same shared keys (`MONGODB_URI`, `REDIS_URL`, `JWT_SECRET`,
-`INTERNAL_SERVICE_TOKEN`) plus `PORT=5002`, `CLOUDINARY_*`,
-`MAIN_SERVER_URL` (internal fallback), `PDF_CACHE_MAX_MB`
-and rate-limit knobs. Validated by zod at boot (`src/config/env.js`).
-The BullMQ queue auto-disables (synchronous fallback) if `REDIS_URL` is unset.
+Shared keys (`MONGODB_URI`, `REDIS_URL`, `JWT_SECRET`,
+`INTERNAL_SERVICE_TOKEN`) plus `PORT=5002`, `CLOUDINARY_*`, `MAIN_SERVER_URL`
+(internal fallback), `PDF_CACHE_MAX_MB` and rate-limit knobs. Validated by zod
+at boot. The BullMQ queue auto-disables (synchronous fallback) if `REDIS_URL`
+is unset.
 
-### Client (`client/.env`)
+### Quiz Server (`quiz-server/.env`)
+| Key | Purpose |
+|---|---|
+| `PORT` | 5001 |
+| `MONGODB_URI` | Shared MongoDB (same cluster) |
+| `JWT_SECRET` | **Same value** as the other services |
+| `CLIENT_URL` | Allowed browser origin |
+| `RATE_LIMIT_WINDOW_MS` / `RATE_LIMIT_MAX` / `TRUST_PROXY` | Rate-limit knobs |
+
+### Client (`client/.env.local`)
 | Key | Purpose |
 |---|---|
 | `API_URL` | Main server base — **server-only**, used by the Next.js rewrite (never in the browser bundle) |
 | `PDF_API_URL` | PDF service base — server-only, same |
 | `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | NextAuth (Google handshake only) |
+| `NEXT_PUBLIC_QUIZ_SERVER_URL` | Quizzo server (public; optional — defaults to `http://localhost:5001`) |
 
-> 🔒 **No `NEXT_PUBLIC_*` URL variables.** The browser calls same-origin
-> `/backend/*` and `/pdfapi/*`; `next.config.ts` rewrites proxy them to the
-> real backends using server-only env vars. Backend URLs never appear in the
-> browser bundle, CORS becomes a non-issue, and the refresh cookie is
-> first-party (no cross-site cookie problems).
->
-> Never commit real secrets. `.env` files are gitignored; `.env.example`
-> files carry placeholders only.
+> 🔒 **No `NEXT_PUBLIC_*` URL variables for the main APIs.** The browser calls
+> same-origin `/backend/*` and `/pdfapi/*`; `next.config.ts` rewrites proxy
+> them to the real backends using server-only env vars. Backend URLs never
+> appear in the browser bundle, CORS becomes a non-issue, and the refresh
+> cookie is first-party.
 
 ---
 
@@ -500,7 +493,7 @@ The BullMQ queue auto-disables (synchronous fallback) if `REDIS_URL` is unset.
 - Node.js 18+
 - MongoDB (local or Atlas)
 - Redis (`brew install redis && redis-server --daemonize yes`)
-- Google OAuth client ID/secret
+- Google OAuth client ID/secret (NextAuth + server verification)
 
 ### Option A — everything at once
 ```bash
@@ -509,34 +502,46 @@ The BullMQ queue auto-disables (synchronous fallback) if `REDIS_URL` is unset.
 
 ### Option B — individually
 ```bash
-# shared package (its own node_modules — required for file: symlinks)
-cd shared && npm install
-
 # main server
-cd ../server && cp .env.example .env   # fill values
-npm install && npm run seed && npm run dev      # :5000
+cd server && cp .env.example .env    # fill values
+npm install && npm run dev           # :5000
 
 # pdf service
-cd ../pdf-service && cp .env.example .env       # fill values
-npm install && npm run dev                      # :5002
+cd ../pdf-service && cp .env.example .env
+npm install && npm run dev           # :5002
+
+# quiz server (optional — only for Quizzo)
+cd ../quiz-server && cp .env.example .env
+npm install && npm run seed && npm run dev   # :5001
 
 # client
-cd ../client && npm install && npm run dev      # :3000
+cd ../client && cp .env.example .env.local   # fill values
+npm install && npm run dev           # :3000
 ```
 
-> `pdf-service/.npmrc` sets `legacy-peer-deps=true` — BullMQ declares an optional
-> `redis@>=5` peer while the shared cache pins `redis@4`.
+> `pdf-service/.npmrc` sets `legacy-peer-deps=true` — BullMQ declares an
+> optional `redis@>=5` peer while the shared cache pins `redis@4`.
 
 ---
 
 ## Testing & Validation Scripts
 
+Self-cleaning smoke tests that run against your real `.env` (MongoDB + Redis)
+— useful after deploys or config changes:
+
 | Script | What it verifies |
 |---|---|
-| `server/test-auth-service.mjs` | login → Redis session → cache-validate → refresh → meta → revoke → revoked-token rejection → inactive-user rejection (8 checks) |
-| `server/test-cross-service.mjs` | main-server JWT accepted by pdf-service, internal endpoint w/ service token, Redis user cache, invalid-token rejection (4 checks) |
-| `server/test-google-flow.mjs` | googleLogin DB flow (find/create/save/login/formatUser) |
-| `server/test-pdf-view.mjs` | cold vs cached PDF view timing, Redis cache write, download filename |
+| `server/scripts/test-auth-service.mjs` | login → Redis session → cache-validate → refresh → revoke → revoked-token rejection → inactive-user rejection (8 checks) |
+| `server/scripts/test-cross-service.mjs` | main-server JWT accepted by pdf-service, internal endpoint w/ service token, Redis user cache, invalid-token rejection (4 checks) |
+| `server/scripts/test-google-flow.mjs` | googleLogin DB flow (find/create/save/login/formatUser) |
+| `server/scripts/test-pdf-view.mjs` | cold vs cached PDF view timing, Redis cache write, download filename |
+| `server/scripts/verify-activity-pipeline.mjs` | E2E activity pipeline (view/presence → aggregates) |
+| `server/scripts/verify-role-perms.mjs` | E2E role/permission matrix |
+| `server/scripts/verify-support-tickets.mjs` | E2E support-ticket lifecycle |
+
+Operational scripts (also under `server/scripts/` + `scripts/`):
+`import-firebase-users.mjs` (one-time user migration), `send_bulk_email.py`
+(SES bulk campaigns, dry-run/test modes), `generate-club-seed.mjs` (codegen).
 
 ---
 
@@ -545,59 +550,73 @@ cd ../client && npm install && npm run dev      # :3000
 | Location | Script | Command |
 |---|---|---|
 | client | `dev` / `build` / `start` / `lint` | `next dev` / `next build` / `next start` / `eslint` |
-| server | `dev` / `start` / `seed` | `node --watch src/server.js` / `node src/server.js` / seed super-admin |
+| server | `dev` / `start` | `node --watch src/server.js` / `node src/server.js` |
 | pdf-service | `dev` / `start` | `node --watch src/server.js` / `node src/server.js` |
+| quiz-server | `dev` / `start` / `seed` | `node --watch src/server.js` / `node src/server.js` / seed question bank |
 
 ---
 
 ## Deployment
 
-- **Client** → **Vercel** (`invertisprepv2.vercel.app`). Set `API_URL` and
-  `PDF_API_URL` (server-only, **without** `NEXT_PUBLIC_` prefix) plus the
-  NextAuth vars — the rewrites are evaluated at build time, so a redeploy is
-  required after changing them.
-- **Main server** → long-running host (**Render/Railway/VPS**): `npm start`,
-  with all env vars above; `NODE_ENV=production`, `TRUST_PROXY=1` behind a proxy.
-- **PDF service** → separate Render service: `npm start`, shared
-  `MONGODB_URI`/`REDIS_URL`/`JWT_SECRET`/`INTERNAL_SERVICE_TOKEN`, Cloudinary keys,
-  `MAIN_SERVER_URL` pointing at the main server's public URL.
-- **Redis** → Render Redis / Upstash; both services need the same `REDIS_URL`.
-- Deployment order: Redis → main server → pdf-service → client → smoke tests
-  (health endpoints, login, PYQ list, PDF view).
+- **Client** → **Vercel**. Set `API_URL` and `PDF_API_URL` (server-only,
+  **without** `NEXT_PUBLIC_` prefix) plus the NextAuth vars — rewrites are
+  evaluated at build time, so redeploy after changing them.
+- **Main server** → long-running host (Render/Railway/VPS): `npm start`, with
+  all env vars above; `NODE_ENV=production`, `TRUST_PROXY=1` behind a proxy.
+- **PDF service** → separate service: `npm start`, shared
+  `MONGODB_URI`/`REDIS_URL`/`JWT_SECRET`/`INTERNAL_SERVICE_TOKEN`, Cloudinary
+  keys, `MAIN_SERVER_URL` pointing at the main server.
+- **Quiz server** → separate service: `npm start`, shared
+  `MONGODB_URI`/`JWT_SECRET`, `CLIENT_URL` set to the app origin.
+- **Redis** → Render Redis / Upstash; all services need the same `REDIS_URL`.
+- Deployment order: Redis → main server → pdf-service → quiz-server → client →
+  smoke tests (health endpoints, login, PYQ list, PDF view).
 
 ---
 
 ## Android WebView App
 
-A separate **Kotlin** project wraps the webapp in a native `WebView`; Google login
-is bridged via a Chrome Custom Tab and a deep link (`invertisprep://auth/callback`)
-that injects the app JWT into the WebView's `localStorage`. On 401 the webapp's
-auto-refresh flow keeps the session alive using the refresh cookie.
+A separate **Kotlin** project wraps the webapp in a native `WebView`; Google
+login is bridged via a Chrome Custom Tab and a deep link
+(`invertisprep://auth/callback`) that injects the app JWT into the WebView's
+`localStorage`. On 401 the webapp's auto-refresh flow keeps the session alive
+using the refresh cookie.
 
 ---
 
 ## Roadmap
 
-- [x] Microservice split (main + pdf-service) with shared Redis/Mongo — ✅ done
-- [x] Redis sessions + auto token refresh — ✅ done
-- [x] Generic watermark + 24-h shared PDF cache — ✅ done (47ms cached views)
-- [x] Slug-based department URLs — ✅ done
-- [ ] Quizzo quiz engine
+- [x] Microservice split (main + pdf-service) with shared Redis/Mongo
+- [x] Redis sessions + auto token refresh
+- [x] Generic watermark + 24-h shared PDF cache (47 ms cached views)
+- [x] Quizzo real-time quiz engine
+- [x] Server-rendered public pages (Next.js ISR)
+- [x] Transactional email (SES automail + Mail Center templates)
+- [x] QCoins payments (Razorpay) + admin backup
 - [ ] Redis-backed distributed rate limiting (currently in-memory per instance)
-- [ ] Load testing (300 users/hour) & auto-scaling
-- [ ] Transactional email (verification, reports)
+- [ ] Full CSP with nonces (blocked on inline AdSense/Analytics scripts)
+- [ ] Load testing & auto-scaling
 
 ---
 
-## Known Issues & Security Notes
+## Contributing
 
-- 🟠 **Rotate any secrets that ever touched git history** (see [Security](#security)).
-- 🟠 **Hardcoded super-admin password** in `seedSuperAdmin.js` (`super123`) — change before production.
-- 🟡 Watermarked PDF bytes are still inspectable via DevTools — the watermark deters sharing, doesn't prevent it.
-- 🟡 Rate limiting is in-memory (per instance); use a Redis store before horizontal scaling.
-- 🟡 Points awarded on PYQ verification are logged in the pdf-service but not synced to the main server's points system yet (webhook TODO).
-- 🟡 `server/node_modules` is partially tracked from an old commit — `git rm -r --cached server/node_modules` recommended.
+Contributions are welcome! Read [CONTRIBUTING.md](CONTRIBUTING.md) to get
+started, and please check [SECURITY.md](SECURITY.md) before reporting anything
+sensitive. For bugs and feature ideas, open an issue with steps to reproduce.
 
 ---
 
-*Made with ❤️ by Ahqaf and Team — Invertis University*
+## License
+
+Released under the [MIT License](LICENSE) — free to use, modify and self-host
+with attribution.
+
+---
+
+<div align="center">
+
+**Crafted with ❤️ by Ahqaf & team at Invertis University**
+**A [WTFBuilds](https://wtfbuilds.com) product** · [invertisprep.in](https://www.invertisprep.in)
+
+</div>

@@ -10,6 +10,7 @@ import connectDB from './config/database.js';
 import { authenticateSocket } from './middleware/auth.js';
 import { registerQuizHandlers } from './socket/index.js';
 import quizRoutes from './routes/quiz.js';
+import { apiLimiter } from './middleware/rateLimit.js';
 
 // Import all models so Mongoose registers schemas for ref lookups
 import './models/User.js';
@@ -47,6 +48,12 @@ async function initServer() {
   app.use(cors({ origin: [CLIENT_URL, 'http://localhost:3000'], credentials: true }));
   app.use(morgan('dev'));
   app.use(express.json());
+
+  // Per-user/IP rate limiting for the HTTP API (sockets are capped separately
+  // by matchmaking limits in the socket handlers). Set TRUST_PROXY=1 when
+  // running behind a reverse proxy so req.ip is the real client.
+  app.set('trust proxy', Number(process.env.TRUST_PROXY || 0));
+  app.use('/api/', apiLimiter);
 
   // Routes
   app.get('/health', (req, res) => {

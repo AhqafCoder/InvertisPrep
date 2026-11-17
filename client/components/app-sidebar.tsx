@@ -10,17 +10,25 @@ import {
   Calendar,
   Upload,
   FileText,
+  FileQuestion,
   BookOpen,
   Flag,
   Bug,
   CalendarDays,
   ShieldCheck,
   Users,
-  HandCoins,
+  DatabaseBackup,
+  KeyRound,
+  Mail,
+  Activity,
+  Megaphone,
+  Settings,
+  Briefcase,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
+import { SidebarInstagramToggle } from "@/components/admin/sidebar-instagram-toggle"
 import {
   Sidebar,
   SidebarContent,
@@ -32,30 +40,60 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 import { useAuth } from "@/contexts/AuthContext"
+import { canAccessAdminRoute } from "@/lib/permissions"
 
 export const adminNavItems = [
   { title: "Dashboard", url: "/admin/dashboard", icon: LayoutDashboard },
+  { title: "Settings", url: "/admin/settings", icon: Settings },
   { title: "Users", url: "/admin/users", icon: Users },
+  { title: "Roles", url: "/admin/roles", icon: KeyRound },
+  { title: "DB Backup", url: "/admin/backup", icon: DatabaseBackup },
+  { title: "Activity Monitor", url: "/admin/activity", icon: Activity },
+  { title: "Marketing", url: "/admin/marketing", icon: Megaphone },
   { title: "Departments", url: "/admin/departments", icon: Building2 },
   { title: "Branches", url: "/admin/branches", icon: GitBranch },
   { title: "Sessions", url: "/admin/sessions", icon: Calendar },
   { title: "Upload PYQ", url: "/admin/upload", icon: Upload },
   { title: "Manage Papers", url: "/admin/papers", icon: FileText },
   { title: "Syllabus", url: "/admin/syllabus", icon: BookOpen },
+  { title: "Career Applications", url: "/admin/careers/applications", icon: Briefcase },
   { title: "Reports", url: "/admin/reports", icon: Flag },
+  { title: "Paper Requests", url: "/admin/requests", icon: FileQuestion },
   { title: "Bug Reports", url: "/admin/bugs", icon: Bug },
-  { title: "Events", url: "/admin/events", icon: CalendarDays }
+  { title: "Events", url: "/admin/events", icon: CalendarDays },
+  {
+    title: "Clubs",
+    url: "/admin/clubs",
+    icon: Users,
+    items: [
+      { title: "Club Pages", url: "/admin/clubs" },
+      { title: "RSVPs", url: "/admin/clubs/registrations" },
+    ],
+  },
+  {
+    title: "Mail",
+    url: "/admin/mail",
+    icon: Mail,
+    items: [
+      { title: "Automail", url: "/admin/mail/automail" },
+      { title: "Mailbox", url: "/admin/mail/mailbox" },
+      { title: "Compose", url: "/admin/mail/compose" },
+      { title: "Logs", url: "/admin/mail/logs" },
+      { title: "Notifications", url: "/admin/mail/notifications" },
+    ],
+  },
 ]
-
-// SRT (Support & Resource Team) sees every admin page except User Management
-const srtHiddenItems = ["/admin/users"]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
   const { user, logout } = useAuth()
 
+  // Permission-based filtering: each admin page's required permission lives in
+  // NAV_PERMISSIONS (lib/permissions). Built-ins resolve through their fixed
+  // sets; custom-role users through their granted permissions; super-admin
+  // sees everything.
   const items = adminNavItems
-    .filter((item) => user?.role !== "srt" || !srtHiddenItems.includes(item.url))
+    .filter((item) => canAccessAdminRoute(user, item.url))
     .map((item) => ({
       ...item,
       isActive: pathname === item.url,
@@ -84,6 +122,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavMain label="Management" items={items} />
       </SidebarContent>
       <SidebarFooter>
+        {user?.role === 'super-admin' && (
+          <div className="px-2 py-1.5">
+            <SidebarInstagramToggle />
+          </div>
+        )}
         <NavUser
           user={{
             name: user?.name || user?.email || "Admin",

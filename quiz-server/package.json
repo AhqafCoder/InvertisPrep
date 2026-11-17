@@ -1,7 +1,15 @@
 {
-  "name": "quiz-server",
+  "name": "invertisprep-quiz-server",
   "version": "1.0.0",
   "description": "Quizzo 1v1 multiplayer quiz server",
+  "private": true,
+  "license": "MIT",
+  "author": "WTFBuilds (https://wtfbuilds.com)",
+  "homepage": "https://www.invertisprep.in",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WTFBuilds/InvertisPrep.git"
+  },
   "type": "module",
   "main": "src/server.js",
   "scripts": {
@@ -17,6 +25,7 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "helmet": "^8.1.0",
-    "morgan": "^1.10.1"
+    "morgan": "^1.10.1",
+    "express-rate-limit": "^8.6.2"
   }
 }
