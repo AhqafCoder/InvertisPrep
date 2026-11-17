@@ -70,6 +70,12 @@ import type {
   ImportPreviewSummary,
   PublicSettings,
   PlatformSettings,
+  CareerApplication,
+  CareerApplicationInput,
+  CareerApplicationListParams,
+  CareerApplicationStats,
+  CareerApplicationStatusSummary,
+  CareerApplicationUpdate,
 } from '@/types';
 
 // Same-origin proxy paths — next.config.ts rewrites forward these to the
@@ -1472,6 +1478,59 @@ export const settingsApi = {
       '/admin/settings/instagram-popup',
       { enabled }
     );
+    return data;
+  },
+};
+
+// Career API
+export const careerApi = {
+  submit: async (data: CareerApplicationInput): Promise<APIResponse<{ id: string }>> => {
+    const { data: res } = await apiClient.post<APIResponse<{ id: string }>>('/careers/apply', data);
+    return res;
+  },
+
+  list: async (params: CareerApplicationListParams = {}): Promise<APIResponse<CareerApplication[]> & { meta: { page: number; limit: number; total: number; totalPages: number } }> => {
+    const query: Record<string, unknown> = {};
+    if (params.page) query.page = params.page;
+    if (params.limit) query.limit = params.limit;
+    if (params.search) query.search = params.search;
+    if (params.status) query.status = params.status;
+    if (params.domain) query.domain = params.domain;
+    if (params.sortBy) query.sortBy = params.sortBy;
+    if (params.sortOrder) query.sortOrder = params.sortOrder;
+    if (params.dateFrom) query.dateFrom = params.dateFrom;
+    if (params.dateTo) query.dateTo = params.dateTo;
+    const { data } = await apiClient.get<APIResponse<CareerApplication[]> & { meta: any }>(
+      '/careers/applications',
+      { params: query }
+    );
+    return data;
+  },
+
+  get: async (id: string): Promise<APIResponse<CareerApplication>> => {
+    const { data } = await apiClient.get<APIResponse<CareerApplication>>(`/careers/applications/${id}`);
+    return data;
+  },
+
+  update: async (id: string, updates: CareerApplicationUpdate): Promise<APIResponse<CareerApplication>> => {
+    const { data } = await apiClient.patch<APIResponse<CareerApplication>>(`/careers/applications/${id}`, updates);
+    return data;
+  },
+
+  delete: async (id: string): Promise<APIResponse> => {
+    const { data } = await apiClient.delete<APIResponse>(`/careers/applications/${id}`);
+    return data;
+  },
+
+  stats: async (): Promise<APIResponse<CareerApplicationStats>> => {
+    const { data } = await apiClient.get<APIResponse<CareerApplicationStats>>('/careers/applications/stats');
+    return data;
+  },
+
+  // The signed-in user's own submissions (newest first) — drives the
+  // application-status chip in the navbar dropdown.
+  getMine: async (): Promise<APIResponse<CareerApplicationStatusSummary[]>> => {
+    const { data } = await apiClient.get<APIResponse<CareerApplicationStatusSummary[]>>('/careers/applications/me');
     return data;
   },
 };
