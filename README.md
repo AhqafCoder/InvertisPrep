@@ -14,7 +14,7 @@
 [![Node](https://img.shields.io/badge/Node-18%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-**A product by [WTFBuilds](https://wtfbuilds.com)**
+**A product by [WTFBuilds](https://wtfbuilds.com)** | **Founded by [AhqafCoder](https://ahqafali.dev)**
 
 </div>
 
