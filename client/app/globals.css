@@ -423,3 +423,22 @@ html.printing-clean .resume-print-watermark {
     animation: none;
   }
 }
+
+/* Careers page — gentle idle bob for the floating application tracker */
+@keyframes ip-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+.ip-float {
+  animation: ip-float 3.5s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ip-float {
+    animation: none;
+  }
+}

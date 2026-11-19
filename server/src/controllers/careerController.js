@@ -172,8 +172,11 @@ export const submitApplication = async (req, res) => {
 
 /**
  * GET /api/careers/applications/me — the signed-in user's own submissions
- * (newest first), so the navbar can show their application status. Own data
- * only — the staff listing endpoints stay behind careers.view.
+ * (newest first), powering the navbar status chip and the "My application"
+ * tracking page. Returns every field the applicant filled in plus the review
+ * workflow (status, reviewer, reviewed-at) so the page is fully dynamic —
+ * staff-only internals (review notes, IP/UA capture) stay excluded. The staff
+ * listing endpoints remain behind careers.view.
  */
 export const getMyApplications = async (req, res) => {
   try {
@@ -183,10 +186,11 @@ export const getMyApplications = async (req, res) => {
     }
     const applications = await CareerApplication.find({ submittedBy: userId })
       .sort({ createdAt: -1 })
-      .limit(10)
-      .select('status appliedDomain createdAt reviewedAt')
+      .limit(20)
+      .select('-ipAddress -userAgent -reviewNotes')
+      .populate('reviewedBy', 'name')
       .lean();
-    return res.json({ success: true, data: applications });
+    return res.json({ success: true, count: applications.length, data: applications });
   } catch (error) {
     console.error('Get my applications error:', error);
     return res.status(500).json({ success: false, message: 'Server error' });
