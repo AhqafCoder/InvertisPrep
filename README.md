@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/wtfbuilds-logo.png" alt="WTFBuilds" width="72">
+<img src="client/public/logo.jpeg" alt="WTFBuilds" width="100">
 
 # 🎓 InvertisPrep
 
