@@ -6,7 +6,7 @@ four services — `client/` (Next.js), `server/` (main API), `pdf-service/` and
 
 ## Getting started
 
-1. Fork the repo and create a branch from `main` (e.g. `feat/quiz-streaks`).
+1. Fork the repo and create a branch from `devlopment` (e.g. `feat/quiz-streaks`).
 2. Follow the [Local Setup](README.md#local-setup) section in the README.
 3. Copy every `.env.example` to a real `.env`/`.env.local` and fill in values —
    **never commit `.env` files or real secrets.**
