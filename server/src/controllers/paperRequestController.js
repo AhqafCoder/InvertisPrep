@@ -308,16 +308,30 @@ export const listRequests = async (req, res) => {
       ];
     }
 
-    const requests = await PaperRequest.find(filter)
-      .populate('departmentId', 'name displayName icon')
-      .populate('branchId', 'name')
-      .populate('requestedBy', 'name email picture')
-      .populate('reviewedBy', 'name email')
-      .sort({ status: 1, createdAt: -1 }) // pending first, newest on top
-      .limit(300)
-      .lean();
+    // No limit — the admin triage page renders every matching request and its
+    // counts must reflect the real totals, not a capped slice.
+    const [requests, matchingCount, statusGroups] = await Promise.all([
+      PaperRequest.find(filter)
+        .populate('departmentId', 'name displayName icon')
+        .populate('branchId', 'name')
+        .populate('requestedBy', 'name email picture')
+        .populate('reviewedBy', 'name email')
+        .sort({ status: 1, createdAt: -1 }) // pending first, newest on top
+        .lean(),
+      PaperRequest.countDocuments(filter),
+      // True totals per status across the whole collection — shown in the page
+      // header even while a status filter or search narrows the list below.
+      PaperRequest.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
+    ]);
 
-    res.json({ success: true, count: requests.length, data: requests });
+    const statusCounts = { pending: 0, fulfilled: 0, rejected: 0 };
+    for (const group of statusGroups) {
+      if (group._id in statusCounts) statusCounts[group._id] = group.count;
+    }
+    statusCounts.total =
+      statusCounts.pending + statusCounts.fulfilled + statusCounts.rejected;
+
+    res.json({ success: true, count: matchingCount, statusCounts, data: requests });
   } catch (error) {
     console.error('List paper requests error:', error);
     res.status(500).json({ success: false, message: 'Server error' });

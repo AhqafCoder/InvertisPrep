@@ -13,6 +13,7 @@ import type {
   PYQFilterQuery,
   PaperRequest,
   CreatePaperRequestDTO,
+  PaperRequestStatusCounts,
   PaperExistsResponse,
   APIResponse,
   UserResponse,
@@ -788,8 +789,14 @@ export const paperRequestApi = {
     return data;
   },
 
-  list: async (params?: { status?: string; search?: string }): Promise<APIResponse<PaperRequest[]>> => {
-    const { data } = await apiClient.get<APIResponse<PaperRequest[]>>('/paper-requests', { params });
+  // Real per-status totals across all requests (server-computed) come back as
+  // statusCounts, so the admin header stays accurate even while filtered.
+  list: async (
+    params?: { status?: string; search?: string }
+  ): Promise<APIResponse<PaperRequest[]> & { statusCounts?: PaperRequestStatusCounts }> => {
+    const { data } = await apiClient.get<
+      APIResponse<PaperRequest[]> & { statusCounts?: PaperRequestStatusCounts }
+    >('/paper-requests', { params });
     return data;
   },
 
