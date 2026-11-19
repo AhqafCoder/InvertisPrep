@@ -54,27 +54,14 @@ import {
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { supportApi, careerApi } from '@/lib/api';
-import type { CareerApplicationStatus, CareerApplicationStatusSummary } from '@/types';
+import {
+  CAREER_STATUS_STYLES,
+  CAREER_STATUS_LABELS,
+} from '@/lib/career-status';
+import type { CareerApplicationStatusSummary } from '@/types';
 import { buildLoginHref } from '@/lib/canonical';
 
 // ============================================================
-// Status chip styling for the user's career application entry in the dropdown
-const CAREER_STATUS_STYLES: Record<CareerApplicationStatus, string> = {
-  pending: 'bg-yellow-100 text-yellow-800',
-  under_review: 'bg-blue-100 text-blue-800',
-  shortlisted: 'bg-purple-100 text-purple-800',
-  rejected: 'bg-red-100 text-red-700',
-  hired: 'bg-emerald-100 text-emerald-800',
-};
-
-const CAREER_STATUS_LABELS: Record<CareerApplicationStatus, string> = {
-  pending: 'Pending',
-  under_review: 'Under review',
-  shortlisted: 'Shortlisted',
-  rejected: 'Not selected',
-  hired: 'Hired',
-};
-
 // Social links — update these two URLs to your real profiles
 // ============================================================
 const SOCIAL_LINKS = {
@@ -604,7 +591,7 @@ export default function Navbar() {
                   </DropdownMenuItem>
                   {careerApplication && (
                     <DropdownMenuItem asChild>
-                      <Link href="/careers" className="w-full cursor-pointer">
+                      <Link href="/careers/my-application" className="w-full cursor-pointer">
                         <Briefcase className="mr-2 h-4 w-4 text-slate-500" />
                         <span className="flex-1">Career application</span>
                         <span
@@ -868,7 +855,7 @@ function MobileMenu({
 
             {careerApplication && (
               <Link
-                href="/careers"
+                href="/careers/my-application"
                 onClick={onNavigate}
                 className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-zinc-100 hover:text-zinc-900 group"
               >

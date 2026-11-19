@@ -5,7 +5,7 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { hasPermission } from '@/lib/permissions';
 import { paperRequestApi } from '@/lib/api';
-import type { PaperRequest } from '@/types';
+import type { PaperRequest, PaperRequestStatusCounts } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -73,6 +73,12 @@ export default function PaperRequestsPage() {
   const canModify = hasPermission(user, 'requests.manage');
 
   const [requests, setRequests] = useState<PaperRequest[]>([]);
+  const [counts, setCounts] = useState<PaperRequestStatusCounts>({
+    pending: 0,
+    fulfilled: 0,
+    rejected: 0,
+    total: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -100,6 +106,9 @@ export default function PaperRequestsPage() {
       });
       if (res.success) {
         setRequests(res.data || []);
+        // Server-computed true totals — the list may itself be narrowed by
+        // status/search, but these always reflect every request in the DB.
+        if (res.statusCounts) setCounts(res.statusCounts);
       } else {
         setError(res.message || 'Failed to load requests');
       }
@@ -113,11 +122,6 @@ export default function PaperRequestsPage() {
   useEffect(() => {
     fetchRequests();
   }, [fetchRequests]);
-
-  const pendingCount = useMemo(
-    () => requests.filter((r) => r.status === 'pending').length,
-    [requests]
-  );
 
   // The dialog reads from `requests` so status updates reflect live.
   const viewRequest = useMemo(
@@ -133,11 +137,19 @@ export default function PaperRequestsPage() {
     setError('');
     setSuccess('');
     setActingId(id);
+    const oldStatus = requests.find((r) => r._id === id)?.status;
     try {
       const res = await paperRequestApi.updateStatus(id, status);
       if (res.success) {
         setSuccess(res.message || 'Request updated');
         setRequests((prev) => prev.map((r) => (r._id === id ? { ...r, status } : r)));
+        if (oldStatus && oldStatus !== status) {
+          setCounts((c) => ({
+            ...c,
+            [oldStatus]: Math.max(0, c[oldStatus] - 1),
+            [status]: c[status] + 1,
+          }));
+        }
       } else {
         setError(res.message || 'Failed to update request');
       }
@@ -153,11 +165,19 @@ export default function PaperRequestsPage() {
     setError('');
     setSuccess('');
     setActingId(id);
+    const deletedStatus = requests.find((r) => r._id === id)?.status;
     try {
       const res = await paperRequestApi.remove(id);
       if (res.success) {
         setSuccess('Request deleted');
         setRequests((prev) => prev.filter((r) => r._id !== id));
+        if (deletedStatus) {
+          setCounts((c) => ({
+            ...c,
+            [deletedStatus]: Math.max(0, c[deletedStatus] - 1),
+            total: Math.max(0, c.total - 1),
+          }));
+        }
       } else {
         setError(res.message || 'Failed to delete request');
       }
@@ -175,7 +195,8 @@ export default function PaperRequestsPage() {
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-black tracking-tight text-slate-900">Paper Requests</h1>
           <p className="text-sm text-slate-500">
-            Papers students asked for — {pendingCount} pending in the current view.
+            Papers students asked for — {counts.total} total · {counts.pending} pending ·{' '}
+            {counts.fulfilled} fulfilled · {counts.rejected} rejected
           </p>
         </div>
 

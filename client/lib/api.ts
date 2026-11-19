@@ -13,6 +13,7 @@ import type {
   PYQFilterQuery,
   PaperRequest,
   CreatePaperRequestDTO,
+  PaperRequestStatusCounts,
   PaperExistsResponse,
   APIResponse,
   UserResponse,
@@ -75,6 +76,7 @@ import type {
   CareerApplicationListParams,
   CareerApplicationStats,
   CareerApplicationStatusSummary,
+  CareerApplicationSelf,
   CareerApplicationUpdate,
 } from '@/types';
 
@@ -788,8 +790,14 @@ export const paperRequestApi = {
     return data;
   },
 
-  list: async (params?: { status?: string; search?: string }): Promise<APIResponse<PaperRequest[]>> => {
-    const { data } = await apiClient.get<APIResponse<PaperRequest[]>>('/paper-requests', { params });
+  // Real per-status totals across all requests (server-computed) come back as
+  // statusCounts, so the admin header stays accurate even while filtered.
+  list: async (
+    params?: { status?: string; search?: string }
+  ): Promise<APIResponse<PaperRequest[]> & { statusCounts?: PaperRequestStatusCounts }> => {
+    const { data } = await apiClient.get<
+      APIResponse<PaperRequest[]> & { statusCounts?: PaperRequestStatusCounts }
+    >('/paper-requests', { params });
     return data;
   },
 
@@ -1581,11 +1589,11 @@ export const careerApi = {
     return data;
   },
 
-  // The signed-in user's own submissions (newest first) — drives the
-  // application-status chip in the navbar dropdown.
-  getMine: async (): Promise<APIResponse<CareerApplicationStatusSummary[]>> => {
+  // The signed-in user's own submissions (newest first, full self-view shape)
+  // — drives the navbar status chip and the /careers/my-application page.
+  getMine: async (): Promise<APIResponse<CareerApplicationSelf[]>> => {
     // skipAuthRedirect: navbar chip poll — failures must not force-logout.
-    const { data } = await apiClient.get<APIResponse<CareerApplicationStatusSummary[]>>('/careers/applications/me', {
+    const { data } = await apiClient.get<APIResponse<CareerApplicationSelf[]>>('/careers/applications/me', {
       skipAuthRedirect: true,
     } as any);
     return data;

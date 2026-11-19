@@ -315,6 +315,15 @@ export interface CreatePaperRequestDTO {
   note?: string;
 }
 
+// True per-status totals for all paper requests, computed server-side so the
+// admin panel counts stay correct regardless of any list filter or search.
+export interface PaperRequestStatusCounts {
+  pending: number;
+  fulfilled: number;
+  rejected: number;
+  total: number;
+}
+
 // Result of checking whether an exact paper already exists before requesting.
 export interface PaperExistsResponse extends APIResponse<PYQPaper | null> {
   exists?: boolean;
@@ -1236,5 +1245,15 @@ export interface CareerApplicationStatusSummary {
   appliedDomain: CareerDomain;
   createdAt: string;
   reviewedAt?: string;
+}
+
+/**
+ * What GET /careers/applications/me returns for the applicant's own tracking
+ * page: every field they filled in plus the review workflow. Staff-only
+ * internals (review notes, IP/UA) are never sent to the applicant.
+ */
+export interface CareerApplicationSelf
+  extends Omit<CareerApplication, 'reviewedBy' | 'reviewNotes'> {
+  reviewedBy?: { _id: string; name: string } | null;
 }
 
