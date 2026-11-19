@@ -315,6 +315,15 @@ export interface CreatePaperRequestDTO {
   note?: string;
 }
 
+// True per-status totals for all paper requests, computed server-side so the
+// admin panel counts stay correct regardless of any list filter or search.
+export interface PaperRequestStatusCounts {
+  pending: number;
+  fulfilled: number;
+  rejected: number;
+  total: number;
+}
+
 // Result of checking whether an exact paper already exists before requesting.
 export interface PaperExistsResponse extends APIResponse<PYQPaper | null> {
   exists?: boolean;
