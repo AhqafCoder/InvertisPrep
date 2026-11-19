@@ -1247,3 +1247,13 @@ export interface CareerApplicationStatusSummary {
   reviewedAt?: string;
 }
 
+/**
+ * What GET /careers/applications/me returns for the applicant's own tracking
+ * page: every field they filled in plus the review workflow. Staff-only
+ * internals (review notes, IP/UA) are never sent to the applicant.
+ */
+export interface CareerApplicationSelf
+  extends Omit<CareerApplication, 'reviewedBy' | 'reviewNotes'> {
+  reviewedBy?: { _id: string; name: string } | null;
+}
+

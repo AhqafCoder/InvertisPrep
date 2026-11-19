@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowRight,
   ArrowUpRight,
   BookOpen,
+  Briefcase,
   Code2,
   Database,
   Globe,
@@ -22,6 +23,14 @@ import {
   Award,
   Zap,
 } from 'lucide-react';
+
+import { careerApi } from '@/lib/api';
+import {
+  CAREER_STATUS_LABELS,
+  CAREER_STATUS_META,
+  CAREER_STATUS_STYLES,
+} from '@/lib/career-status';
+import type { CareerApplicationStatusSummary } from '@/types';
 
 type RoleType = 'creative' | 'technical' | 'support' | 'marketing';
 
@@ -186,9 +195,35 @@ const TYPE_CHIP_STYLES: Record<RoleType, string> = {
 
 const roleParam = (role: Role) => role.param ?? role.id;
 
+const formatDate = (value: string) =>
+  new Date(value).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+
 export default function CareersClient() {
   const [filter, setFilter] = useState<RoleType | 'all'>('all');
   const visibleRoles = filter === 'all' ? ROLES : ROLES.filter(r => r.type === filter);
+
+  // Signed-in visitors who already applied get a "track it" strip above the
+  // hero. Silent-fail poll — this page is public and the banner is a bonus.
+  const [myApplication, setMyApplication] = useState<CareerApplicationStatusSummary | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    careerApi
+      .getMine()
+      .then((res) => {
+        if (!cancelled && res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setMyApplication(res.data[0]);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-white" suppressHydrationWarning>
@@ -554,6 +589,54 @@ export default function CareersClient() {
           </div>
         </section>
       </main>
+
+        {/* ── Floating application tracker (signed-in applicants only) ────
+            Docked above the site-wide Instagram FAB (bottom-5 right-5,
+            size-12) so the two stack instead of overlapping. */}
+        {myApplication && (
+          <div className="fixed bottom-[84px] right-5 z-40">
+            <div className="ip-float">
+              <div className="ip-rise [animation-delay:500ms]">
+                <Link
+                  href="/careers/my-application"
+                  className="group flex items-center gap-3 rounded-full border border-gray-200 bg-white/90 py-2 pl-2 pr-4 shadow-xl shadow-gray-300/40 backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:border-purple-300 hover:shadow-2xl hover:shadow-purple-300/40 active:scale-95 sm:pr-5"
+                >
+                  {/* Pulsing gradient chip with the live status dot on its edge */}
+                  <span className="relative flex shrink-0">
+                    <span
+                      className="absolute inset-0 animate-ping rounded-full bg-purple-400 opacity-30 motion-reduce:animate-none"
+                      aria-hidden="true"
+                    />
+                    <span className="relative flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/30">
+                      <Briefcase className="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <span
+                      className={`absolute -right-0.5 -top-0.5 h-3.5 w-3.5 rounded-full ring-2 ring-white ${CAREER_STATUS_META[myApplication.status].dot}`}
+                      aria-hidden="true"
+                    />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block max-w-[200px] truncate text-sm font-bold text-gray-900 sm:max-w-[240px]">
+                      {myApplication.appliedDomain}
+                    </span>
+                    <span className="mt-0.5 flex items-center gap-2 text-xs text-gray-500">
+                      <span>Applied {formatDate(myApplication.createdAt)}</span>
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${CAREER_STATUS_STYLES[myApplication.status]}`}
+                      >
+                        {CAREER_STATUS_LABELS[myApplication.status]}
+                      </span>
+                    </span>
+                  </span>
+                  <ArrowUpRight
+                    className="h-4 w-4 shrink-0 text-gray-300 transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-purple-600"
+                    aria-hidden="true"
+                  />
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 }

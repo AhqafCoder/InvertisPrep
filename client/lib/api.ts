@@ -76,6 +76,7 @@ import type {
   CareerApplicationListParams,
   CareerApplicationStats,
   CareerApplicationStatusSummary,
+  CareerApplicationSelf,
   CareerApplicationUpdate,
 } from '@/types';
 
@@ -1588,11 +1589,11 @@ export const careerApi = {
     return data;
   },
 
-  // The signed-in user's own submissions (newest first) — drives the
-  // application-status chip in the navbar dropdown.
-  getMine: async (): Promise<APIResponse<CareerApplicationStatusSummary[]>> => {
+  // The signed-in user's own submissions (newest first, full self-view shape)
+  // — drives the navbar status chip and the /careers/my-application page.
+  getMine: async (): Promise<APIResponse<CareerApplicationSelf[]>> => {
     // skipAuthRedirect: navbar chip poll — failures must not force-logout.
-    const { data } = await apiClient.get<APIResponse<CareerApplicationStatusSummary[]>>('/careers/applications/me', {
+    const { data } = await apiClient.get<APIResponse<CareerApplicationSelf[]>>('/careers/applications/me', {
       skipAuthRedirect: true,
     } as any);
     return data;
