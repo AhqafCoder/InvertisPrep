@@ -19,7 +19,7 @@ import type {
 } from '@/types';
 import { toCanvas } from 'html-to-image';
 import jsPDF from 'jspdf';
-import { CheckCircle2, Clock, Coins, CreditCard, Download, FileUp, Gift, LayoutDashboard, Loader2, Lock, Plus, Printer, RotateCcw, Save, Shield, Sparkles, Trash2, Wallet } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, Coins, CreditCard, Download, FileUp, Gift, LayoutDashboard, Loader2, Lock, Plus, Printer, RotateCcw, Save, Shield, Sparkles, Trash2, Wallet } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -93,6 +93,34 @@ export function createStarterResume(forUser?: { name?: string; email?: string; p
     ],
     languages: ['English', 'Hindi'],
     certifications: ['Certified Web Professional-Web Developer', 'Java Development Certified Professional'],
+  };
+}
+
+// Placeholder identity values the starter template ships with. When a guest
+// draft is migrated into a logged-in account these must not persist — swap
+// them for the real account identity (keep anything the guest actually typed).
+const STARTER_PLACEHOLDERS = {
+  name: 'Demo Student',
+  email: 'demo.student@example.com',
+  phone: '+1-555-0100',
+  linkUrls: ['github.com/demo-student', 'linkedin.com/in/demo-student', 'instagram.com/demo.student'],
+};
+
+export function hydrateStarterIdentity(
+  draft: ResumeDraft,
+  forUser?: { name?: string; email?: string; phoneNumber?: string } | null,
+): ResumeDraft {
+  const norm = (url: string) => url.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '').toLowerCase();
+  const isPlaceholderLink = (url: string) => STARTER_PLACEHOLDERS.linkUrls.some((demo) => norm(demo) === norm(url));
+  return {
+    ...draft,
+    personal: {
+      ...draft.personal,
+      name: draft.personal.name?.trim() === STARTER_PLACEHOLDERS.name ? (forUser?.name?.trim() || draft.personal.name) : draft.personal.name,
+      email: draft.personal.email?.trim() === STARTER_PLACEHOLDERS.email ? (forUser?.email?.trim() || draft.personal.email) : draft.personal.email,
+      phone: draft.personal.phone?.trim() === STARTER_PLACEHOLDERS.phone ? (forUser?.phoneNumber?.trim() || draft.personal.phone) : draft.personal.phone,
+      links: (draft.personal.links ?? []).filter((link) => !isPlaceholderLink(link.url ?? '')),
+    },
   };
 }
 
@@ -207,18 +235,28 @@ export function ResumeBuilder() {
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const firstAutosaveToastShown = useRef(false);
 
-  // Task 1: track which id is already loaded to avoid redundant fetches
+  // Track which id is already loaded to avoid redundant fetches
   const loadedIdRef = useRef<string | null>(null);
+  // Which account ('guest' or user.id) the in-memory resume was loaded for
+  const loadedForRef = useRef<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
 
   // Guest mode: allow access without login
   // Auth redirect removed to support guest resume building
 
-  // Task 1: id-keyed load effect — re-runs whenever ?id changes
+  // id-keyed load effect — re-runs whenever ?id changes
   const idParam = searchParams.get('id');
+  // Bumped by the Retry button after a load failure
+  const [retryNonce, setRetryNonce] = useState(0);
+  const [loadError, setLoadError] = useState(false);
+
+  // Identity is tracked by user.id, not the user object: AuthContext's
+  // optimistic-bootstrap → /auth/me revalidate swaps in a fresh object for the
+  // same person, and re-running the loader on that flip raced duplicate
+  // starter creates and wiped in-flight edits.
+  const userId = user?.id ?? null;
 
   // Unified resume loader — handles both guests and authenticated users cleanly
-  // without race conditions, cancel loops, or refresh dependencies.
   useEffect(() => {
     if (loading) return; // Wait until AuthContext finishes checking session
 
@@ -226,11 +264,11 @@ export function ResumeBuilder() {
 
     // ── Guest Mode (not logged in) ───────────────────────────────────
     if (!user) {
-      if (loadedIdRef.current && loadedIdRef.current.startsWith('guest-')) {
+      if (loadedForRef.current === 'guest') {
         // Guest draft already loaded in memory
         return;
       }
-      setBooting(true);
+      loadedForRef.current = 'guest';
       const starter = createStarterResume(null);
       const guestResume: Resume = {
         ...starter,
@@ -242,28 +280,37 @@ export function ResumeBuilder() {
       loadedIdRef.current = guestResume._id;
       setIsDirty(false);
       setSavedAt(null);
+      setLoadError(false);
       setBooting(false);
       return;
     }
 
     // ── Logged-in User ───────────────────────────────────────────────
-    // If the exact requested resume is already in state, do nothing
-    if (idParam && loadedIdRef.current === idParam && resume && resume._id === idParam) {
-      return;
-    }
+    // Already loaded this account's resume (and the exact ?id if one was
+    // requested)? Skip — covers revalidate-driven effect recreation.
+    const alreadyLoaded =
+      loadedForRef.current === user.id &&
+      resume != null &&
+      (!idParam || (loadedIdRef.current === idParam && resume._id === idParam));
+    if (alreadyLoaded) return;
 
     setBooting(true);
+    setLoadError(false);
 
     const load = async () => {
       try {
         let activeResume: Resume | null = null;
 
         if (idParam) {
-          // Explicit ?id in URL — fetch this specific document
-          const result = await resumeApi.get(idParam);
-          if (cancelled) return;
-          if (result.data) {
-            activeResume = result.data;
+          try {
+            // Explicit ?id in URL — fetch this specific document
+            const result = await resumeApi.get(idParam);
+            if (cancelled) return;
+            activeResume = result.data ?? null;
+          } catch {
+            // Stale or foreign id in the URL (deleted resume, old bookmark) —
+            // fall through to the account's resumes instead of dead-ending
+            if (cancelled) return;
           }
         }
 
@@ -271,43 +318,46 @@ export function ResumeBuilder() {
         if (!activeResume) {
           const list = await resumeApi.list();
           if (cancelled) return;
-          if (list.data && list.data.length > 0) {
-            activeResume = list.data[0];
-          } else {
-            // First time user — create initial resume pre-populated with user details
-            const starter = createStarterResume(user);
-            const created = await resumeApi.create(starter);
+          const first = list.data?.[0];
+          if (first?._id) {
+            // list() returns a light projection (title + name only) —
+            // fetch the full document so the editor doesn't boot with blanks
+            // that autosave would then persist over the real resume
+            const full = await resumeApi.get(first._id);
             if (cancelled) return;
-            if (created.data) {
-              activeResume = created.data;
-            }
+            activeResume = full.data ?? null;
           }
         }
 
-        if (cancelled) return;
+        // First time user — create initial resume pre-populated with user details
+        if (!activeResume) {
+          const starter = createStarterResume(user);
+          const created = await resumeApi.create(starter);
+          if (cancelled) return;
+          activeResume = created.data ?? null;
+        }
 
-        if (activeResume) {
-          const sanitized = safeResume(activeResume, user);
-          setResume(sanitized);
-          loadedIdRef.current = sanitized._id;
-          setIsDirty(false);
-          setSavedAt(null);
+        if (!activeResume) throw new Error('Resume load returned no resume');
 
-          // Keep browser URL synchronized without triggering a page reload/unmount cycle
-          if (typeof window !== 'undefined' && window.location.search !== `?id=${sanitized._id}`) {
-            const newUrl = `${window.location.pathname}?id=${sanitized._id}`;
-            window.history.replaceState(null, '', newUrl);
-          }
+        const sanitized = safeResume(activeResume, user);
+        loadedForRef.current = user.id;
+        loadedIdRef.current = sanitized._id;
+        setResume(sanitized);
+        setIsDirty(false);
+        setSavedAt(null);
+        setBooting(false);
+
+        // Keep browser URL synchronized without triggering a page reload/unmount cycle
+        if (typeof window !== 'undefined' && window.location.search !== `?id=${sanitized._id}`) {
+          const newUrl = `${window.location.pathname}?id=${sanitized._id}`;
+          window.history.replaceState(null, '', newUrl);
         }
       } catch (err) {
-        if (!cancelled) {
-          console.error('[ResumeBuilder] Failed to load resume:', err);
-          toast.error('Could not load your resume. Please try again.');
-        }
-      } finally {
-        if (!cancelled) {
-          setBooting(false);
-        }
+        if (cancelled) return;
+        console.error('[ResumeBuilder] Failed to load resume:', err);
+        setLoadError(true);
+        setBooting(false);
+        toast.error('Could not load your resume. Please try again.');
       }
     };
 
@@ -315,7 +365,10 @@ export function ResumeBuilder() {
     return () => {
       cancelled = true;
     };
-  }, [loading, user, idParam]);
+    // `user` is intentionally tracked via `userId` (same person = no reload);
+    // `resume` is read only through the refs-guarded alreadyLoaded check.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, userId, idParam, retryNonce]);
 
   // Task 3: debounced autosave — fires 2s after last edit when isDirty (logged-in only)
   const saveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -629,6 +682,23 @@ export function ResumeBuilder() {
     reader.readAsText(file);
     event.target.value = '';
   };
+
+  if (loadError && !resume) {
+    return (
+      <div className="min-h-[70vh] grid place-items-center px-4">
+        <div className="max-w-sm text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50 text-amber-500">
+            <AlertTriangle className="h-6 w-6" />
+          </div>
+          <h2 className="mt-4 text-base font-bold text-slate-900">Couldn&apos;t load your resume</h2>
+          <p className="mt-1 text-sm text-slate-500">Check your connection and try again. Your saved work is safe.</p>
+          <Button onClick={() => setRetryNonce((n) => n + 1)} className="mt-5 bg-slate-900 font-semibold text-white hover:bg-slate-800">
+            <RotateCcw className="mr-2 h-4 w-4" /> Try again
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading || booting || !resume) {
     return <div className="min-h-[70vh] grid place-items-center"><Loader2 className="h-7 w-7 animate-spin text-indigo-600" /></div>;
