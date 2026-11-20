@@ -95,6 +95,7 @@ const roleConsequence = (value: string, roleName: string): string => {
     case 'student':
       return 'Removes all admin dashboard access — takes effect on their next request.';
     case 'srt':
+      return 'Grants the SRT area of the admin dashboard.';
     case 'admin':
       return 'Grants full admin dashboard access (destructive actions stay super-admin-only).';
     case 'super-admin':
