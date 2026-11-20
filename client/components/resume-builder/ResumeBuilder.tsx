@@ -5,8 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { resumeApi, walletApi, aiApi } from '@/lib/api';
-import { hasPermission } from '@/lib/permissions';
+import { resumeApi, walletApi } from '@/lib/api';
 import type {
   Resume,
   ResumeDraft,
@@ -19,7 +18,7 @@ import type {
 } from '@/types';
 import { toCanvas } from 'html-to-image';
 import jsPDF from 'jspdf';
-import { AlertTriangle, CheckCircle2, Clock, Coins, CreditCard, Download, FileUp, Gift, LayoutDashboard, Loader2, Lock, Plus, Printer, RotateCcw, Save, Shield, Sparkles, Trash2, Wallet } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, Coins, CreditCard, Download, FileUp, Gift, LayoutDashboard, Loader2, Plus, Printer, RotateCcw, Save, Shield, Sparkles, Trash2, Wallet } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -27,7 +26,6 @@ import { Label } from '@/components/ui/label';
 import { Spotlight } from '@/components/ui/spotlight';
 import { SavePromptModal } from './SavePromptModal';
 import { ResizablePanels } from './ResizablePanels';
-import { AIPanel } from './AIPanel';
 
 let razorpayScriptPromise: Promise<boolean> | null = null;
 const loadRazorpayScript = (): Promise<boolean> => {
@@ -759,13 +757,6 @@ export function ResumeBuilder() {
       {/* 3-Panel Resizable Workspace — fills remaining height, each column scrolls independently */}
       <main className="flex-1 min-h-0 overflow-hidden p-1.5 sm:p-2">
         <ResizablePanels
-          left={
-            <AIPanel
-              resume={resume}
-              update={update}
-              updatePersonal={updatePersonal}
-            />
-          }
           center={
             <ResumeEditor
               resume={resume}
@@ -1010,94 +1001,6 @@ function DownloadModal({
 const inputClass = 'bg-white focus-visible:border-indigo-400 focus-visible:ring-indigo-100';
 const textareaClass = 'w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100';
 
-function RephraseButton({
-  text,
-  field,
-  onRephrased,
-}: {
-  text: string;
-  field: string;
-  onRephrased: (newText: string) => void;
-}) {
-  const { user } = useAuth();
-  const canUseAI = hasPermission(user, 'ai.resume');
-  const [loading, setLoading] = useState(false);
-  const [lastUndo, setLastUndo] = useState<string | null>(null);
-
-  const handleClick = async () => {
-    if (!canUseAI) {
-      toast.info('AI Rephrase requires an authorized role. You can edit directly in the text box.');
-      return;
-    }
-    if (!text || !text.trim()) {
-      toast.error('Write some text first to rephrase.');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await aiApi.rephrase(text, field);
-      if (res.success && res.data?.text) {
-        setLastUndo(text);
-        onRephrased(res.data.text);
-        toast.success('Text rephrased! Click Undo if you prefer the original.');
-      } else {
-        toast.error(res.message ?? 'Could not rephrase text.');
-      }
-    } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        'AI rephrase failed.';
-      toast.error(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleUndo = () => {
-    if (lastUndo !== null) {
-      onRephrased(lastUndo);
-      setLastUndo(null);
-      toast.info('Restored original text');
-    }
-  };
-
-  return (
-    <div className="inline-flex items-center gap-1.5">
-      {lastUndo !== null && (
-        <button
-          type="button"
-          onClick={handleUndo}
-          className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-200 transition"
-          title="Restore original text"
-        >
-          <RotateCcw size={10} /> Undo
-        </button>
-      )}
-      <button
-        type="button"
-        disabled={loading}
-        onClick={handleClick}
-        className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold transition shadow-2xs ${
-          canUseAI
-            ? 'border-indigo-200/80 bg-indigo-50/70 text-indigo-700 hover:bg-indigo-100 hover:border-indigo-300'
-            : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'
-        }`}
-        title={canUseAI ? "Rephrase professionally with AI" : "AI Rephrase requires an authorized role"}
-      >
-        {loading ? (
-          <Loader2 size={11} className="animate-spin text-indigo-600" />
-        ) : canUseAI ? (
-          <Sparkles size={11} className="text-indigo-500" />
-        ) : (
-          <Lock size={10} className="text-slate-400" />
-        )}
-        <span>Rephrase</span>
-      </button>
-    </div>
-  );
-}
-
 function ResumeEditor({ resume, update, updatePersonal }: { resume: Resume; update: (patch: Partial<Resume>) => void; updatePersonal: (patch: Partial<Resume['personal']>) => void }) {
   const setArray = <K extends 'education' | 'experience' | 'projects' | 'skillGroups' | 'achievements' | 'languages' | 'certifications'>(key: K, value: Resume[K]) => update({ [key]: value } as Partial<Resume>);
   return <aside className="no-print resume-editor relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -1130,16 +1033,7 @@ function ResumeEditor({ resume, update, updatePersonal }: { resume: Resume; upda
           <RemoveButton onClick={() => updatePersonal({ links: resume.personal.links.filter((_, i) => i !== index) })} />
         </div>)}
       </EditorSection>
-      <EditorSection
-        title="Summary"
-        actionExtra={
-          <RephraseButton
-            text={resume.summary}
-            field="summary"
-            onRephrased={(newText) => update({ summary: newText })}
-          />
-        }
-      >
+      <EditorSection title="Summary">
         <textarea className={`${textareaClass} min-h-28`} value={resume.summary} onChange={(e) => update({ summary: e.target.value })} placeholder="Write a concise, achievement-focused professional summary." />
       </EditorSection>
       <EditorSection title="Education" action={() => setArray('education', [emptyEducation(), ...resume.education])}>
@@ -1170,12 +1064,10 @@ function EditorSection({
   title,
   children,
   action,
-  actionExtra,
 }: {
   title: string;
   children: React.ReactNode;
   action?: () => void;
-  actionExtra?: React.ReactNode;
 }) {
   return (
     <section className="mb-6">
@@ -1185,7 +1077,6 @@ function EditorSection({
           {title}
         </h2>
         <div className="flex items-center gap-2">
-          {actionExtra}
           {action && (
             <Button type="button" onClick={action} variant="outline" size="sm" className="h-7 gap-1 border-slate-200 px-2 text-xs font-semibold text-slate-600 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600">
               <Plus size={14} /> Add
@@ -1229,28 +1120,14 @@ function ExperienceEditor({ item, onChange, onRemove }: { item: ResumeExperience
         <EditorInput compact type="month" value={item.startDate} onChange={(startDate) => onChange({ ...item, startDate })} />
         <EditorInput compact type="month" value={item.endDate} onChange={(endDate) => onChange({ ...item, endDate })} />
       </div>
-      <div className="mt-2.5 flex items-center justify-between">
-        <span className="text-[11px] font-semibold text-slate-500">Role description</span>
-        <RephraseButton
-          text={item.description}
-          field="description"
-          onRephrased={(newText) => onChange({ ...item, description: newText })}
-        />
-      </div>
+      <p className="mt-2.5 text-[11px] font-semibold text-slate-500">Role description</p>
       <textarea
         className={`${textareaClass} mt-1 min-h-20`}
         value={item.description}
         placeholder="Company or role description (optional)"
         onChange={(e) => onChange({ ...item, description: e.target.value })}
       />
-      <div className="mt-2.5 flex items-center justify-between">
-        <p className="text-xs font-semibold text-slate-600">Achievements — one item per line</p>
-        <RephraseButton
-          text={item.achievements.join('\n')}
-          field="achievement"
-          onRephrased={(newText) => onChange({ ...item, achievements: newText.split('\n') })}
-        />
-      </div>
+      <p className="mt-2.5 text-xs font-semibold text-slate-600">Achievements — one item per line</p>
       <textarea
         className={`${textareaClass} mt-1 min-h-24`}
         value={item.achievements.join('\n')}
@@ -1270,28 +1147,14 @@ function ProjectEditor({ item, onChange, onRemove }: { item: ResumeProject; onCh
         <EditorInput compact type="month" value={item.startDate} onChange={(startDate) => onChange({ ...item, startDate })} />
         <EditorInput compact type="month" value={item.endDate} onChange={(endDate) => onChange({ ...item, endDate })} />
       </div>
-      <div className="mt-2.5 flex items-center justify-between">
-        <span className="text-[11px] font-semibold text-slate-500">Project description</span>
-        <RephraseButton
-          text={item.description}
-          field="description"
-          onRephrased={(newText) => onChange({ ...item, description: newText })}
-        />
-      </div>
+      <p className="mt-2.5 text-[11px] font-semibold text-slate-500">Project description</p>
       <textarea
         className={`${textareaClass} mt-1 min-h-20`}
         value={item.description}
         placeholder="Project description"
         onChange={(e) => onChange({ ...item, description: e.target.value })}
       />
-      <div className="mt-2.5 flex items-center justify-between">
-        <p className="text-xs font-semibold text-slate-600">Achievements — one item per line</p>
-        <RephraseButton
-          text={item.achievements.join('\n')}
-          field="achievement"
-          onRephrased={(newText) => onChange({ ...item, achievements: newText.split('\n') })}
-        />
-      </div>
+      <p className="mt-2.5 text-xs font-semibold text-slate-600">Achievements — one item per line</p>
       <textarea
         className={`${textareaClass} mt-1 min-h-24`}
         value={item.achievements.join('\n')}

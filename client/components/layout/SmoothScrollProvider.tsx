@@ -52,6 +52,10 @@ export default function SmoothScrollProvider({ children }: { children: React.Rea
 
   // The admin console opts out of smooth scrolling entirely.
   const isAdmin = pathname.startsWith('/admin');
+  // The resume builder is a fixed-viewport workspace whose editor and preview
+  // panels scroll independently — Lenis would hijack wheel events for the
+  // non-scrolling window and the panels would never receive them.
+  const isBuilder = pathname.startsWith('/resume-builder');
 
   // ── Boot Lenis ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -59,8 +63,8 @@ export default function SmoothScrollProvider({ children }: { children: React.Rea
     // on native scroll behaviour — its sidebar, dropdowns and dialogs all
     // manage their own scrolling. Emulated momentum there fights with
     // those and makes the panel feel wrong, so the admin routes are
-    // excluded entirely.
-    if (isAdmin) return;
+    // excluded entirely. The resume builder opts out for the same reason.
+    if (isAdmin || isBuilder) return;
 
     const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (prefersReduced) return;
@@ -95,7 +99,7 @@ export default function SmoothScrollProvider({ children }: { children: React.Rea
       lenisRef.current = null;
       setIsReady(false);
     };
-  }, [isAdmin]);
+  }, [isAdmin, isBuilder]);
 
   // ── Reset scroll on route change ────────────────────────────────────
   useEffect(() => {
