@@ -3,6 +3,7 @@ import { User } from '../models/User.js';
 import { PointsLog } from '../models/PointsLog.js';
 import { PYQPaper } from '../models/PYQPaper.js';
 import { calculateUserBadges } from '../utils/badges.js';
+import { getCachedJSON, setCachedJSON } from '../shared/cache.js';
 
 // Escape user input before embedding it into a RegExp
 const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -31,6 +32,21 @@ export const getLeaderboard = async (req, res) => {
     const limitNum = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
     const skip = (pageNum - 1) * limitNum;
     const searchRegex = search && search.trim() ? new RegExp(escapeRegex(search.trim()), 'i') : null;
+
+    // Serve repeat visitors from Redis — these responses are public and
+    // identical for everyone, so N requests collapse into ~1 aggregation set
+    // per 30s window instead of burning CPU credits on the t3.micro box.
+    // Search queries bypass the cache: their keys are unbounded.
+    const cacheKey = searchRegex
+      ? null
+      : `lb:v1:board:${type}:${department || 'all'}:${pageNum}:${limitNum}`;
+    if (cacheKey) {
+      const cached = await getCachedJSON(cacheKey);
+      if (cached) {
+        res.json(cached);
+        return;
+      }
+    }
 
     let rankings = [];
     let total = 0;
@@ -230,14 +246,18 @@ export const getLeaderboard = async (req, res) => {
       });
     }
 
-    res.json({
+    const payload = {
       success: true,
       data: rankings,
       page: pageNum,
       limit: limitNum,
       total,
       totalPages: Math.max(1, Math.ceil(total / limitNum)),
-    });
+    };
+    if (cacheKey) {
+      await setCachedJSON(cacheKey, payload, 30);
+    }
+    res.json(payload);
   } catch (error) {
     console.error('Error fetching leaderboard:', error);
     res.status(500).json({ success: false, message: 'Server error retrieving leaderboard rankings' });
@@ -248,6 +268,15 @@ export const getLeaderboard = async (req, res) => {
 export const getMyStats = async (req, res) => {
   try {
     const userId = req.user.id;
+
+    // Per-user stats include 4 rank computations over users + papers —
+    // a 30s cache keeps profile/leaderboard refreshes from re-running them.
+    const statsCacheKey = `lb:v1:me:${userId}`;
+    const cachedStats = await getCachedJSON(statsCacheKey);
+    if (cachedStats) {
+      res.json(cachedStats);
+      return;
+    }
 
     // 1. Fetch user details
     const user = await User.findById(userId);
@@ -369,7 +398,7 @@ export const getMyStats = async (req, res) => {
     ]);
     const uploadsRank = (uploadRankAgg[0]?.count || 0) + 1;
 
-    res.json({
+    const payload = {
       success: true,
       data: {
         points: user.points || 0,
@@ -384,7 +413,9 @@ export const getMyStats = async (req, res) => {
         },
         badges,
       },
-    });
+    };
+    await setCachedJSON(statsCacheKey, payload, 30);
+    res.json(payload);
   } catch (error) {
     console.error('Error fetching personal leaderboard stats:', error);
     res.status(500).json({ success: false, message: 'Server error retrieving stats' });

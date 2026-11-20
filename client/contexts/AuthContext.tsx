@@ -74,15 +74,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const storedUser = localStorage.getItem('user');
 
       if (token && storedUser) {
+        // Optimistic bootstrap: the stored session renders IMMEDIATELY instead
+        // of waiting on the network. Previously `loading` stayed true until the
+        // /auth/me round-trip finished — and since access tokens expire every
+        // 15 minutes, the first load after an idle period ran a 401 → refresh
+        // → retry chain (three sequential requests) before anything rendered.
+        // That window was the "clicking does nothing" boot delay.
         try {
           const parsed = JSON.parse(storedUser);
           setUser(parsed);
           preloadAvatar(parsed.picture);
-          // Revalidate against the backend. A failure here must NOT sign the
-          // user out unless the backend actually rejected the token — a 404,
-          // 429 rate-limit, 5xx or network blip must leave the session intact
-          // (the axios interceptor already handles any 401 via the refresh
-          // flow). Only 401/403 after the interceptor gives up clears state.
+          setLoading(false);
+        } catch {
+          // Corrupted stored user — drop it and fall through to revalidation.
+          localStorage.removeItem('user');
+        }
+
+        // Revalidate against the backend in the background. A failure here
+        // must NOT sign the user out unless the backend actually rejected the
+        // token — a 404, 429 rate-limit, 5xx or network blip must leave the
+        // session intact (the axios interceptor already handles any 401 via
+        // the refresh flow). Only 401/403 after the interceptor gives up
+        // clears state.
+        try {
           const response = await authApi.getCurrentUser();
           if (response.success && response.user) {
             setUser(response.user);
@@ -94,10 +108,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // Token genuinely rejected (and refresh failed) → clear session.
             localStorage.removeItem('token');
             localStorage.removeItem('user');
+            setUser(null);
           }
           // Any other error: keep the stored session and continue optimistically.
         }
       }
+
       setLoading(false);
     };
 

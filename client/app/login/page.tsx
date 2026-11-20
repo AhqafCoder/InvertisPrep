@@ -228,8 +228,13 @@ export default function LoginPage() {
                 try {
                   const guestResume = JSON.parse(guestResumeData);
                   // Import the API and create the resume
-                  const { resumeApi } = await import('@/lib/api');
-                  const migrateResponse = await resumeApi.create(guestResume);
+                  const [{ resumeApi }, { hydrateStarterIdentity }] = await Promise.all([
+                    import('@/lib/api'),
+                    import('@/components/resume-builder/ResumeBuilder'),
+                  ]);
+                  // Swap starter placeholders (Demo Student, demo links) for the
+                  // real account identity before persisting the migrated draft
+                  const migrateResponse = await resumeApi.create(hydrateStarterIdentity(guestResume, response.data.user));
                   if (migrateResponse.data) {
                     // Clear guest data after successful save
                     localStorage.removeItem('resume-builder-guest-draft');
