@@ -533,7 +533,7 @@ function LeaderboardContent() {
                             {/* score */}
                             <div className="shrink-0 text-right">
                               <span className="block text-lg font-black tabular-nums tracking-tight text-slate-900">
-                                {(boardType === 'contributors' ? entry.uploads : entry.points).toLocaleString()}
+                                {((boardType === 'contributors' ? entry.uploads : entry.points) ?? 0).toLocaleString()}
                               </span>
                               <span className="block text-[10px] font-bold uppercase leading-none text-slate-400">
                                 {boardType === 'contributors' ? 'papers' : 'pts'}

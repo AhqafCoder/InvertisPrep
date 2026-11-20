@@ -89,18 +89,24 @@ const PDF_SERVICE_URL = '/pdfapi';
 
 // Create axios instance for main API
 // withCredentials: the refresh cookie is set by the backend on a different
-// origin (Vercel → Render), so the browser must be allowed to store/send it
+// origin (Vercel → Render), so the browser must be allowed to store/send it.
+// timeout: without it a momentarily hung backend request froze gated pages
+// indefinitely — fail fast (the UI shows its own error states) instead.
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_URL,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },
   withCredentials: true,
 });
 
-// Create axios instance for PDF service
+// Create axios instance for PDF service. The watermark/render pipeline is
+// legitimately slower than plain JSON endpoints (large papers on a small
+// EC2 box), so this gets a generous ceiling instead of the JSON timeout.
 const pdfServiceClient: AxiosInstance = axios.create({
   baseURL: PDF_SERVICE_URL,
+  timeout: 60000,
   headers: {
     'Content-Type': 'application/json',
   },
