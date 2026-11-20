@@ -47,6 +47,7 @@ import {
   X,
   Linkedin,
   Instagram,
+  Github,
   Share2,
   HandCoins,
   Heart,
@@ -62,11 +63,12 @@ import type { CareerApplicationStatusSummary } from '@/types';
 import { buildLoginHref } from '@/lib/canonical';
 
 // ============================================================
-// Social links — update these two URLs to your real profiles
+// Social links — update these URLs to your real profiles
 // ============================================================
 const SOCIAL_LINKS = {
   linkedin: 'https://www.linkedin.com/company/invertisprep',
   instagram: 'https://www.instagram.com/invertisprep.in',
+  github: 'https://github.com/WTFBuilds/InvertisPrep',
 };
 
 // ============================================================
@@ -94,6 +96,7 @@ function NewBadge() {
 const SOCIAL_HOVER_STYLES = {
   linkedin: 'hover:bg-[#0A66C2]/10 hover:text-[#0A66C2] focus-visible:ring-[#0A66C2]/40',
   instagram: 'hover:bg-gradient-to-br hover:from-[#f9ce34]/15 hover:via-[#ee2a7b]/15 hover:to-[#6228d7]/15 hover:text-[#ee2a7b] focus-visible:ring-[#ee2a7b]/40',
+  github: 'hover:bg-slate-900/10 hover:text-slate-900 focus-visible:ring-slate-900/40',
 } as const;
 
 function SocialIconLink({
@@ -478,6 +481,9 @@ export default function Navbar() {
           <div className="hidden items-center gap-0.5 border-r border-slate-200 pr-2 mr-1 lg:flex">
             <SocialIconLink href={SOCIAL_LINKS.linkedin} label="InvertisPrep on LinkedIn" platform="linkedin">
               <Linkedin className="h-4 w-4" />
+            </SocialIconLink>
+            <SocialIconLink href={SOCIAL_LINKS.github} label="InvertisPrep on GitHub" platform="github">
+              <Github className="h-4 w-4" />
             </SocialIconLink>
             <SocialIconLink href={SOCIAL_LINKS.instagram} label="InvertisPrep on Instagram" platform="instagram">
               <Instagram className="h-4 w-4" />
@@ -899,6 +905,9 @@ function MobileMenu({
         <div className="mt-2 flex items-center gap-1 border-t border-slate-100 px-3 pt-3">
           <SocialIconLink href={SOCIAL_LINKS.linkedin} label="InvertisPrep on LinkedIn" platform="linkedin">
             <Linkedin className="h-4 w-4" />
+          </SocialIconLink>
+          <SocialIconLink href={SOCIAL_LINKS.github} label="InvertisPrep on GitHub" platform="github">
+            <Github className="h-4 w-4" />
           </SocialIconLink>
           <SocialIconLink href={SOCIAL_LINKS.instagram} label="InvertisPrep on Instagram" platform="instagram">
             <Instagram className="h-4 w-4" />

@@ -342,6 +342,8 @@ export interface APIResponse<T = unknown> {
   data?: T;
   count?: number;
   error?: string;
+  total?: number;
+  totalPages?: number;
 }
 
 // ── Admin Mail Center types ─────────────────────────────────────────────────

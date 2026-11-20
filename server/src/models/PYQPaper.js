@@ -116,6 +116,7 @@ const pyqPaperSchema = new Schema(
 // Compound indexes for common queries
 pyqPaperSchema.index({ departmentId: 1, branchId: 1, semester: 1, verified: 1 });
 pyqPaperSchema.index({ verified: 1, isActive: 1 });
+pyqPaperSchema.index({ uploadedBy: 1, verified: 1, isActive: 1 });
 pyqPaperSchema.index({ year: -1, downloads: -1 });
 // Optimized index for public listing: filter by departmentId + verified + isActive, sort by year + downloads
 pyqPaperSchema.index({ departmentId: 1, verified: 1, isActive: 1, year: -1, downloads: -1 });
