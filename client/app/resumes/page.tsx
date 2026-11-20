@@ -60,7 +60,8 @@ export default function ResumesDashboardPage() {
   const createResume = async () => {
     setCreating(true);
     try {
-      const response = await resumeApi.create(createStarterResume());
+      // Pass the account so the starter pre-fills real identity, not placeholders
+      const response = await resumeApi.create(createStarterResume(user));
       if (!response.data) throw new Error();
       router.push(`/resume-builder?id=${response.data._id}`);
     } catch {

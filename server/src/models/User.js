@@ -112,6 +112,9 @@ const userSchema = new Schema(
 
 // Indexes
 userSchema.index({ role: 1, isActive: 1 });
+// Leaderboard: filter active users, sort by points — makes the board an index
+// walk instead of an in-memory sort over every user on each request.
+userSchema.index({ isActive: 1, points: -1 });
 
 // Invalidate Redis cache when role, role assignment or isActive changes
 userSchema.post('save', async function(doc) {

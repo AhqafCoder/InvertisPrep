@@ -27,6 +27,15 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { toast } from 'sonner';
+import {
   AlertCircle,
   ChevronLeft,
   ChevronRight,
@@ -75,6 +84,26 @@ const ROLE_SELECT_BUILTINS: { value: UserRole; label: string }[] = [
   { value: 'admin', label: 'Admin' },
   { value: 'super-admin', label: 'Super Admin' },
 ];
+
+// The role gates admin dashboard access via the permissions system — this copy
+// makes that (otherwise invisible) consequence explicit in the confirm dialog.
+const roleConsequence = (value: string, roleName: string): string => {
+  if (value.startsWith('role:')) {
+    return `Grants only the permissions defined in the "${roleName}" role.`;
+  }
+  switch (value) {
+    case 'student':
+      return 'Removes all admin dashboard access — takes effect on their next request.';
+    case 'srt':
+      return 'Grants the SRT area of the admin dashboard.';
+    case 'admin':
+      return 'Grants full admin dashboard access (destructive actions stay super-admin-only).';
+    case 'super-admin':
+      return 'Grants complete access, including deleting users and managing roles.';
+    default:
+      return 'Changes what this account can access on their next request.';
+  }
+};
 
 const roleBadge = (user: Pick<AdminUser, 'role' | 'roleLabel' | 'roleColor'>) => {
   if (user.role === 'staff') {
@@ -204,30 +233,59 @@ export default function AdminUsersPage() {
   const roleSelectValue = (u: AdminUser) =>
     u.role === 'staff' && u.roleId ? `role:${u.roleId}` : u.role;
 
-  const handleRoleChange = async (id: string, value: string) => {
+  // Pending role change awaiting confirmation in the dialog
+  const [roleConfirm, setRoleConfirm] = useState<{
+    id: string;
+    value: string;
+    builtinRole: UserRole;
+    customRoleId: string | null;
+    userName: string;
+    roleName: string;
+  } | null>(null);
+
+  const handleRoleChange = (id: string, value: string) => {
+    const target = users.find((u) => u.id === id);
+    if (!target) return;
+
+    // No-op guard: re-selecting the current role is a common accident that
+    // used to round-trip the API and change nothing.
+    if (roleSelectValue(target) === value) {
+      toast.info(`${target.name} already has this role`);
+      return;
+    }
+
     const isCustom = value.startsWith('role:');
     const customRoleId = isCustom ? value.slice(5) : null;
     const builtinRole = (isCustom ? 'staff' : value) as UserRole;
-
     const roleName = isCustom
       ? customRoles.find((r) => r.id === customRoleId)?.label || 'custom role'
-      : builtinRole;
-    if (!window.confirm(`Change this user's role to "${roleName}"?`)) return;
+      : BUILTIN_ROLE_META[builtinRole]?.label || builtinRole;
 
+    setRoleConfirm({ id, value, builtinRole, customRoleId, userName: target.name, roleName });
+  };
+
+  const confirmRoleChange = async () => {
+    if (!roleConfirm) return;
+    const { id, builtinRole, customRoleId, roleName } = roleConfirm;
+    setRoleConfirm(null);
     setNotice(null);
     try {
       const res = await adminUserApi.updateRole(id, builtinRole, customRoleId);
       if (res.success) {
         // Refresh the row from the server so roleLabel/roleColor stay accurate
         fetchUsers();
+        toast.success(res.message || `Role updated to ${roleName}`);
         setNotice(res.message || 'Role updated');
         adminUserApi.stats().then((s) => s.success && s.data && setStats(s.data));
       } else {
+        toast.error(res.message || 'Failed to update role');
         setError(res.message || 'Failed to update role');
       }
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
-      setError(e.response?.data?.message || 'Failed to update role');
+      const msg = e.response?.data?.message || 'Failed to update role';
+      toast.error(msg);
+      setError(msg);
     }
   };
 
@@ -649,6 +707,26 @@ export default function AdminUsersPage() {
           adminUserApi.stats().then((s) => s.success && s.data && setStats(s.data));
         }}
       />
+
+      {/* Role change confirmation — states what access the change grants/removes */}
+      <Dialog open={!!roleConfirm} onOpenChange={(open) => !open && setRoleConfirm(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change role to &ldquo;{roleConfirm?.roleName}&rdquo;?</DialogTitle>
+            <DialogDescription>
+              {roleConfirm?.userName} &rarr;{' '}
+              <span className="font-semibold text-slate-700">{roleConfirm?.roleName}</span>.
+              {roleConfirm ? ` ${roleConsequence(roleConfirm.value, roleConfirm.roleName)}` : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setRoleConfirm(null)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmRoleChange}>Confirm change</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
