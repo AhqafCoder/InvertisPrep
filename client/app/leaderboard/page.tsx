@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Trophy, Medal, Crown, Star, Award, Users,
-  CheckCircle2, Flame, ChevronRight, Search, Landmark,
-  Sparkles, ShieldCheck,
+  CheckCircle2, Flame, ChevronRight, ChevronLeft, Search, Landmark,
+  Sparkles, ShieldCheck, FileUp, FileText,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
@@ -24,6 +24,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 interface LeaderboardEntry {
   userId: string;
   points: number;
+  uploads: number;
   name: string;
   email: string;
   picture?: string;
@@ -37,6 +38,7 @@ interface UserStats {
   weeklyPoints: number;
   allTimeRank: number;
   weeklyRank: number;
+  uploadsRank: number;
   stats: {
     verifiedUploads: number;
     quizWins: number;
@@ -84,9 +86,13 @@ export default function LeaderboardPage() {
 
 function LeaderboardContent() {
   const { user } = useAuth();
-  const [boardType, setBoardType] = useState<'all_time' | 'weekly'>('all_time');
+  const [boardType, setBoardType] = useState<'all_time' | 'weekly' | 'contributors'>('all_time');
   const [selectedDept, setSelectedDept] = useState<string>('all');
+  const [searchInput, setSearchInput] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [page, setPage] = useState<number>(1);
+  const [total, setTotal] = useState<number>(0);
+  const [totalPages, setTotalPages] = useState<number>(1);
 
   const [rankings, setRankings] = useState<LeaderboardEntry[]>([]);
   const [myStats, setMyStats] = useState<UserStats | null>(null);
@@ -118,15 +124,26 @@ function LeaderboardContent() {
     loadDepts();
   }, []);
 
+  // Debounce search input so typing doesn't spam the API
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInput);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
   // Load Rankings
   useEffect(() => {
     async function fetchRankings() {
       setLoadingList(true);
       try {
         const deptParam = selectedDept === 'all' ? undefined : selectedDept;
-        const res = await leaderboardApi.getRankings(boardType, deptParam);
+        const res = await leaderboardApi.getRankings(boardType, deptParam, searchQuery || undefined, page, 50);
         if (res.success && res.data) {
           setRankings(res.data);
+          setTotal(res.total || 0);
+          setTotalPages(res.totalPages || 1);
         }
       } catch (err) {
         console.error('Error fetching rankings:', err);
@@ -135,7 +152,7 @@ function LeaderboardContent() {
       }
     }
     fetchRankings();
-  }, [boardType, selectedDept]);
+  }, [boardType, selectedDept, searchQuery, page]);
 
   // Load My Stats & Badges
   useEffect(() => {
@@ -158,11 +175,6 @@ function LeaderboardContent() {
     }
     fetchMyStats();
   }, [user]);
-
-  const filteredRankings = rankings.filter((entry) =>
-    entry.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (entry.course && entry.course.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
 
   const getRankBadgeStyle = (rank: number) => {
     switch (rank) {
@@ -256,17 +268,23 @@ function LeaderboardContent() {
                   </div>
                 </div>
 
-                <div className="relative mt-6 grid grid-cols-2 gap-3">
+                <div className="relative mt-6 grid grid-cols-3 gap-3">
                   <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 text-center">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">All-Time Rank</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">All-Time</p>
                     <p className="mt-1 text-3xl font-black tabular-nums tracking-tight text-slate-900">
                       {loadingStats ? '…' : `#${myStats?.allTimeRank || '-'}`}
                     </p>
                   </div>
                   <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 text-center">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Weekly Rank</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Weekly</p>
                     <p className="mt-1 text-3xl font-black tabular-nums tracking-tight text-indigo-600">
                       {loadingStats ? '…' : `#${myStats?.weeklyRank || '-'}`}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 text-center">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Uploads</p>
+                    <p className="mt-1 text-3xl font-black tabular-nums tracking-tight text-emerald-600">
+                      {loadingStats ? '…' : `#${myStats?.uploadsRank || '-'}`}
                     </p>
                   </div>
                 </div>
@@ -365,7 +383,10 @@ function LeaderboardContent() {
                 <Tabs
                   defaultValue="all_time"
                   value={boardType}
-                  onValueChange={(val) => setBoardType(val as 'all_time' | 'weekly')}
+                  onValueChange={(val) => {
+                    setBoardType(val as 'all_time' | 'weekly' | 'contributors');
+                    setPage(1);
+                  }}
                   className="w-auto"
                 >
                   <TabsList className="rounded-lg bg-slate-100 p-1">
@@ -374,6 +395,9 @@ function LeaderboardContent() {
                     </TabsTrigger>
                     <TabsTrigger value="weekly" className="rounded-md px-3.5 py-1 text-xs font-semibold">
                       <Flame className="mr-1.5 h-3.5 w-3.5 text-pink-500" /> Weekly
+                    </TabsTrigger>
+                    <TabsTrigger value="contributors" className="rounded-md px-3.5 py-1 text-xs font-semibold">
+                      <FileUp className="mr-1.5 h-3.5 w-3.5 text-emerald-500" /> Uploaders
                     </TabsTrigger>
                   </TabsList>
                 </Tabs>
@@ -385,15 +409,18 @@ function LeaderboardContent() {
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="Search students..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search all students..."
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
                     className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-4 text-sm text-slate-900 transition-all placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
                 <select
                   value={selectedDept}
-                  onChange={(e) => setSelectedDept(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedDept(e.target.value);
+                    setPage(1);
+                  }}
                   className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 transition-all focus:border-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   <option value="all">🎓 All Departments</option>
@@ -416,7 +443,7 @@ function LeaderboardContent() {
                     >
                       {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-16 rounded-xl" />)}
                     </motion.div>
-                  ) : filteredRankings.length === 0 ? (
+                  ) : rankings.length === 0 ? (
                     <motion.div
                       key="empty"
                       initial={{ opacity: 0, scale: 0.95 }}
@@ -438,7 +465,7 @@ function LeaderboardContent() {
                       exit={{ opacity: 0 }}
                       className="space-y-3"
                     >
-                      {filteredRankings.map((entry, index) => {
+                      {rankings.map((entry, index) => {
                         const isMe = entry.userId === user?.id;
                         return (
                           <motion.div
@@ -474,16 +501,24 @@ function LeaderboardContent() {
 
                             {/* details */}
                             <div className="min-w-0 flex-1">
-                              <p className={`flex items-center gap-1.5 truncate text-sm font-semibold ${
+                              <div className={`flex items-center gap-1.5 truncate text-sm font-semibold ${
                                 isMe ? 'text-indigo-600' : 'text-slate-900'
                               }`}>
                                 {entry.name}
                                 {isMe && (
                                   <Badge variant="indigo" className="px-1.5 py-0 text-[9px]">YOU</Badge>
                                 )}
-                              </p>
+                              </div>
                               <p className="mt-0.5 flex items-center gap-2 truncate text-xs text-slate-500">
                                 <span>{entry.course || 'Student'}</span>
+                                {entry.uploads > 0 && (
+                                  <>
+                                    <span className="h-1 w-1 rounded-full bg-slate-300" />
+                                    <span className="flex items-center gap-1">
+                                      <FileText className="h-3 w-3" /> {entry.uploads} {entry.uploads === 1 ? 'paper' : 'papers'}
+                                    </span>
+                                  </>
+                                )}
                                 {entry.followersCount > 0 && (
                                   <>
                                     <span className="h-1 w-1 rounded-full bg-slate-300" />
@@ -498,9 +533,11 @@ function LeaderboardContent() {
                             {/* score */}
                             <div className="shrink-0 text-right">
                               <span className="block text-lg font-black tabular-nums tracking-tight text-slate-900">
-                                {entry.points.toLocaleString()}
+                                {(boardType === 'contributors' ? entry.uploads : entry.points).toLocaleString()}
                               </span>
-                              <span className="block text-[10px] font-bold uppercase leading-none text-slate-400">pts</span>
+                              <span className="block text-[10px] font-bold uppercase leading-none text-slate-400">
+                                {boardType === 'contributors' ? 'papers' : 'pts'}
+                              </span>
                             </div>
                           </motion.div>
                         );
@@ -508,6 +545,34 @@ function LeaderboardContent() {
                     </motion.div>
                   )}
                 </AnimatePresence>
+
+                {/* pagination */}
+                {!loadingList && rankings.length > 0 && (
+                  <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
+                    <p className="text-xs font-medium text-slate-500">
+                      Page {page} of {totalPages} · {total.toLocaleString()}{' '}
+                      {boardType === 'contributors' ? 'contributors' : 'students'}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={page <= 1}
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      >
+                        <ChevronLeft className="mr-1 h-4 w-4" /> Prev
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={page >= totalPages}
+                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      >
+                        Next <ChevronRight className="ml-1 h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </GlowCard>
 
