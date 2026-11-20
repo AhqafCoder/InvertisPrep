@@ -706,9 +706,16 @@ export const adminMailApi = {
 };
 
 export const leaderboardApi = {
-  getRankings: async (type: 'all_time' | 'weekly', department?: string): Promise<APIResponse<any>> => {
-    const params: Record<string, string> = { type };
+  getRankings: async (
+    type: 'all_time' | 'weekly' | 'contributors',
+    department?: string,
+    search?: string,
+    page = 1,
+    limit = 50
+  ): Promise<APIResponse<any>> => {
+    const params: Record<string, string> = { type, page: String(page), limit: String(limit) };
     if (department) params.department = department;
+    if (search && search.trim()) params.search = search.trim();
     const { data } = await apiClient.get<APIResponse<any>>('/leaderboard', { params });
     return data;
   },
